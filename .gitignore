@@ -1,0 +1,4 @@
+# Sim-Ausgabe: Charts/Histogramme im Root ignorieren, Trace-Ordner sichtbar lassen
+output/*
+!output/run*/
+!output/trace_index.txt
