@@ -61,29 +61,6 @@ func TestHeatReflectionNWToSE(t *testing.T) {
 	t.Fatal("expected heat reflection from NW")
 }
 
-func TestVoltageSpikeWhenNoDemand(t *testing.T) {
-	cfg := testCfg()
-	cfg.ShiftDemands = board.ShiftDemands{}
-	cfg.InitialHeat = 0
-	cfg.InitialChips = []sim.Chip{{
-		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 8, R: 1},
-		Dir:  hex.RotE.TravelDir(),
-	}}
-
-	rng := rand.New(rand.NewSource(3))
-	_, snaps := sim.RunTrace(board.NewEmpty(), rng, cfg)
-	foundSpike := false
-	for _, snap := range snaps {
-		if snap.Event == "Spannungs-Spike" {
-			foundSpike = true
-			break
-		}
-	}
-	if !foundSpike {
-		t.Fatal("expected voltage spike when border has no demand")
-	}
-}
 
 func TestVoltageDeliveryConsumesDemand(t *testing.T) {
 	cfg := testCfg()
@@ -138,13 +115,13 @@ func TestVoltageSEDoesNotConsumePlantDemand(t *testing.T) {
 	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
 	firstBoundary := ""
 	for _, snap := range snaps {
-		if snap.Event == "Spannungs-Spike" || strings.HasPrefix(snap.Event, "Rand-Bedarf ") {
+		if strings.HasPrefix(snap.Event, "Rand-Bedarf ") || strings.HasPrefix(snap.Event, "Rand-Schaden ") {
 			firstBoundary = snap.Event
 			break
 		}
 	}
-	if firstBoundary != "Spannungs-Spike" {
-		t.Fatalf("SE into wall with only plant demand must spike first, got %q", firstBoundary)
+	if firstBoundary != board.BorderDamageEvent(board.ZoneResidential) {
+		t.Fatalf("SE into wall with only plant demand must damage residential first, got %q", firstBoundary)
 	}
 }
 

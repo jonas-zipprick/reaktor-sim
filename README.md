@@ -27,8 +27,9 @@ go run ./cmd/sim -runs 20 -out output
 | `-seed` | Zeitstempel | Reproduzierbarer Zufallsseed |
 | `-out` | `output` | Verzeichnis für PNG-Charts |
 | `-heat` | 1 | Wärme-Chips am Zünder pro Schicht |
-| `-trace` | false | Schichten aufzeichnen, Graph pro Schritt in `runN/` |
-| `-trace-runs` | 0 (= `-runs`) | Aufgezeichnete Läufe; `0` zeichnet alle `-runs` auf |
+| `-trace-first` | -1 (aus) | Erste n Läufe aufzeichnen; `0` = alle `-runs` |
+| `-trace-loop` | 0 (aus) | Schrittlimit-Läufe aufzeichnen (max. n Stück) |
+| `-trace-win` | 0 (aus) | Gewonnene Läufe aufzeichnen (alle Bedarfe erfüllt, max. n) |
 
 ## Ausgabe
 
@@ -40,22 +41,49 @@ go run ./cmd/sim -runs 20 -out output
 - `spannung_reaktoreigenbedarf.png` – Spannung am Kraftwerksrand
 - `spielfeld.png` / `spielfeld.txt` – Brettdarstellung mit Symbolen und Bedarfen
 - `graph.png` / `graph.txt` – Flussgraph (rot=Wärme, grün=Neutron, blau=Spannung)
-- `runN/graph_runN_SSS.png` – Graph pro Simulationsschritt (mit `-trace`)
-- `runN/trace.txt` – Ereignisprotokoll pro Lauf
+- `runN/graph_runN_SSS.png` – Graph pro Simulationsschritt (mit `-trace-first`)
+- `runN/trace.yaml` – Ereignisprotokoll pro Lauf
 
 ### Trace-Modus
 
 ```bash
-go run ./cmd/sim -seed 1 -trace -out output
+go run ./cmd/sim -seed 1 -trace-first 0 -out output
 ```
 
-Mit Standard `-runs 20` entstehen `run1/` … `run20/` mit je `graph_runN_SSS.png`.
-Weniger Traces: `-trace -trace-runs 5`. Mehr Statistik: `-runs 5000` (ohne `-trace` schneller).
+Mit `-trace-first 0` werden alle `-runs` Läufe aufgezeichnet (`run1/` … `runN/`).
+Weniger Traces: `-trace-first 5`. Mehr Statistik: `-runs 5000` (ohne Trace-Flags schneller).
+
+## Seed-Suche
+
+Separates Meta-Programm zum Durchprobieren vieler Board-Seeds und Finden von Brettern mit vielen Wins oder Loops:
+
+```bash
+go run ./cmd/seedsearch -from 1 -to 1000 -runs 100 -top 10
+```
+
+Pro Seed wird ein Brett erzeugt und `-runs` Monte-Carlo-Läufe ausgeführt. Am Ende erscheinen zwei Ranglisten (Top Wins / Top Loops). Optional `-out seeds.yaml` für die vollständigen Ergebnisse.
+
+| Flag | Standard | Beschreibung |
+|------|----------|--------------|
+| `-from` / `-to` | 1 / 1 | Seed-Bereich |
+| `-runs` | 100 | Läufe pro Seed |
+| `-top` | 10 | Einträge pro Rangliste |
+| `-cost-p1` | 0 | Feste Reaktor-Kosten (0 = zufällig) |
+| `-cost-p2` | 0 | Feste Stromnetz-Kosten (0 = zufällig) |
+| `-out` | — | Vollständige Ergebnisse als YAML |
+| `-progress` | true | Fortschrittsbalken auf stderr |
+
+```bash
+go run ./cmd/seedsearch -from 1 -to 500 -runs 50 -cost-p1 15 -cost-p2 20 -top 5
+```
+
+Simulations-Flags entsprechen `cmd/sim`.
 
 ## Projektstruktur
 
 ```
-cmd/sim/          CLI-Einstiegspunkt
+cmd/sim/          Monte-Carlo-Simulator mit Charts und Trace
+cmd/seedsearch/   Seed-Suche (Wins/Loops über viele Bretter)
 internal/
   board/          Game State & Zufallsgenerator
   field/          Feldtypen & Kosten

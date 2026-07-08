@@ -26,12 +26,11 @@ var railCells = []hex.Coord{{Q: 5, R: 2}, {Q: 6, R: 2}, {Q: 7, R: 2}}
 var residentialCells = []hex.Coord{{Q: 8, R: 0}, {Q: 8, R: 1}, {Q: 8, R: 2}}
 var plantCells = []hex.Coord{{Q: 5, R: 0}, {Q: 5, R: 2}}
 
-// ApplyDemands places demand chips on wired border cells for a new shift.
+// ApplyDemands adds demand chips on wired border cells for a new shift.
 func (s *State) ApplyDemands(d ShiftDemands) {
 	if s.Demands == nil {
 		s.Demands = make(map[hex.Coord][4]int)
 	}
-	s.Demands = make(map[hex.Coord][4]int)
 	distributeZone(s, ZoneIndustry, d.Industry, industryCells)
 	distributeZone(s, ZoneRail, d.Rail, railCells)
 	distributeZone(s, ZoneResidential, d.Residential, residentialCells)

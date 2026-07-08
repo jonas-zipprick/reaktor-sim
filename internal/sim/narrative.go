@@ -13,7 +13,7 @@ func dirName(travelDir int) string {
 	return hex.DisplayDirName(travelDir)
 }
 
-func narrate(event string, resolved *Chip, b *board.State, queue []Chip) string {
+func narrate(event string, resolved *Chip, b *board.State, queue []Chip, emitted []Chip) string {
 	switch event {
 	case "Start":
 		return narrateStart(queue)
@@ -36,11 +36,19 @@ func narrate(event string, resolved *Chip, b *board.State, queue []Chip) string 
 			return fmt.Sprintf("Spannungs-Spike: Spannung wird in Richtung %s reflektiert.", dirName(resolved.Dir))
 		}
 		return narrateWithoutChip(event, b, queue)
-	case "Zuender-Abpraller", "Freiwilliger Schuss":
+	case "Zuender-Treffer":
+		if resolved != nil {
+			return fmt.Sprintf("%s trifft den Zünder und wird vernichtet.", chipName(resolved.Type))
+		}
+		return "Ein Chip trifft den Zünder und wird vernichtet."
+	case "Freiwilliger Schuss":
 		return narrateWithoutChip(event, b, queue)
 	}
 	if resolved != nil {
 		if text := narrateBorderDemand(event, *resolved); text != "" {
+			return text
+		}
+		if text := narrateBorderDamage(event, *resolved); text != "" {
 			return text
 		}
 	}
@@ -54,7 +62,7 @@ func narrate(event string, resolved *Chip, b *board.State, queue []Chip) string 
 			chipAccusative(resolved.Type), dirName(resolved.Dir),
 		))
 	}
-	if detail := narrateResolved(event, *resolved, b, queue); detail != "" {
+	if detail := narrateResolved(event, *resolved, b, queue, emitted); detail != "" {
 		parts = append(parts, detail)
 	}
 	if len(parts) == 0 {
@@ -97,17 +105,6 @@ func narrateWithoutChip(event string, b *board.State, queue []Chip) string {
 			}
 		}
 		return "Spieler 2 feuert Spannung freiwillig ab."
-	case "Zuender-Abpraller":
-		emitter := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
-		for _, c := range queue {
-			if c.Pos == emitter {
-				return fmt.Sprintf(
-					"Der Zünder nimmt %s auf und feuert %s wieder in Richtung %s ab.",
-					chipIgniterPickup(c.Type), chipIgniterPronoun(c.Type), dirName(c.Dir),
-				)
-			}
-		}
-		return "Der Zünder nimmt einen Chip auf und feuert ihn wieder ab."
 	case "Waerme-Reflektion":
 		for _, c := range queue {
 			if c.Type == ChipHeat {
@@ -126,6 +123,14 @@ func narrateWithoutChip(event string, b *board.State, queue []Chip) string {
 	return event
 }
 
+func narrateBorderDamage(event string, chip Chip) string {
+	z, ok := board.ZoneFromBorderDamageEvent(event)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%s erzeugt Schaden in %s (kein Bedarf frei).", chipName(chip.Type), z.String())
+}
+
 func narrateBorderDemand(event string, chip Chip) string {
 	z, ok := board.ZoneFromBorderDemandEvent(event)
 	if !ok {
@@ -134,7 +139,7 @@ func narrateBorderDemand(event string, chip Chip) string {
 	return fmt.Sprintf("%s erfüllt Rand-Bedarf %s.", chipName(chip.Type), z.String())
 }
 
-func narrateResolved(event string, chip Chip, b *board.State, queue []Chip) string {
+func narrateResolved(event string, chip Chip, b *board.State, queue []Chip, emitted []Chip) string {
 	target := chip.Pos.Neighbor(chip.Dir)
 	if !target.Valid() {
 		return ""
@@ -143,7 +148,7 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip) stri
 
 	switch event {
 	case "Feldreaktion", "Notgenerator zerstoert":
-		return narrateFieldHit(chip, target, tile, queue, event == "Notgenerator zerstoert")
+		return narrateFieldHit(chip, target, tile, queue, emitted, event == "Notgenerator zerstoert")
 	case "Turbine":
 		emitted := emittedAt(queue, target)
 		if chip.Type == ChipHeat {
@@ -177,35 +182,41 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip) stri
 	return ""
 }
 
-func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip, destroyed bool) string {
+func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip, emitted []Chip, destroyed bool) string {
 	name := fieldShortName(tile.Type)
 	incoming := chipName(chip.Type)
-	emitted := emittedAt(queue, target)
+	released := emitted
+	if len(released) == 0 {
+		released = emittedAt(queue, target)
+	}
 
 	if destroyed {
-		return fmt.Sprintf("%s trifft den %s — er wird sofort zerstört.", incoming, name)
+		return fmt.Sprintf("%s trifft den Notgenerator — er wird sofort zerstört.", incoming)
 	}
 
 	switch tile.Type {
 	case field.CoalChamber, field.GasBoiler, field.Transformer, field.HVCascade:
-		if len(emitted) > 0 {
+		if len(released) > 0 && len(emitted) > 0 {
 			return fmt.Sprintf(
 				"%s trifft %s. %s schießt %s ab. %s",
-				incoming, name, capitalize(name), formatChipCount(emitted), formatDirRolls(emitted),
+				incoming, name, capitalize(name), formatChipCount(released), formatDirRolls(released),
 			)
+		}
+		if len(released) > 0 && len(emitted) == 0 {
+			return fmt.Sprintf("%s trifft %s, reagiert aber nicht.", incoming, name)
 		}
 		return fmt.Sprintf("%s trifft %s, reagiert aber nicht.", incoming, name)
 
 	case field.UraniumPlate:
-		if chip.Type == ChipHeat && len(emitted) == 1 {
+		if chip.Type == ChipHeat && len(released) == 1 {
 			return fmt.Sprintf(
 				"%s trifft Uran und wird abgelenkt. %s",
-				incoming, formatDirRolls(emitted),
+				incoming, formatDirRolls(released),
 			)
 		}
-		if chip.Type == ChipNeutron && len(emitted) > 0 {
-			neutrons := filterType(emitted, ChipNeutron)
-			heats := filterType(emitted, ChipHeat)
+		if chip.Type == ChipNeutron && len(released) > 0 {
+			neutrons := filterType(released, ChipNeutron)
+			heats := filterType(released, ChipHeat)
 			var parts []string
 			if len(neutrons) > 0 {
 				parts = append(parts, fmt.Sprintf("%d Neutronen (%s)", len(neutrons), dirList(neutrons)))
@@ -222,24 +233,26 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 
 	case field.Tokamak:
 		if chip.Type == ChipNeutron {
-			if len(emitted) > 0 {
+			if len(released) > 0 {
 				return fmt.Sprintf(
 					"Tokamak zündet nach 4 Neutronen und schießt %s ab. %s",
-					formatChipCount(emitted), formatDirRolls(emitted),
+					formatChipCount(released), formatDirRolls(released),
 				)
 			}
 			return fmt.Sprintf("Neutron trifft Tokamak (%d/4 bis zur Zündung).", tile.TokamakCounter)
 		}
 
 	case field.Mirror:
-		if len(emitted) == 1 {
-			return narrateWireField(incoming, "den Spiegel", chip, emitted[0])
+		if chip.Type == ChipVoltage {
+			return fmt.Sprintf("%s trifft %s und passiert ihn.", incoming, name)
 		}
+		return narrateWireField(incoming, "den Spiegel", chip, wireEmittedChip(chip, tile))
 
 	case field.Relay:
-		if len(emitted) == 1 {
-			return narrateWireField(incoming, "das Relais", chip, emitted[0])
+		if chip.Type != ChipVoltage {
+			return fmt.Sprintf("%s trifft %s und passiert ihn.", incoming, name)
 		}
+		return narrateWireField(incoming, "das Relais", chip, wireEmittedChip(chip, tile))
 
 	case field.CoolingTower:
 		if chip.Type == ChipHeat {
@@ -252,28 +265,28 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 		}
 
 	case field.Ground:
-		if chip.Type == ChipVoltage && len(emitted) == 0 {
+		if chip.Type == ChipVoltage && len(released) == 0 {
 			return fmt.Sprintf("Spannung trifft Erdung und wird abgeleitet (Ladung %d).", tile.Charge)
 		}
 
 	case field.CapacitorBank, field.PumpedStorage, field.LeadAccumulator:
-		if chip.Type == ChipVoltage && len(emitted) == 0 {
+		if chip.Type == ChipVoltage && len(released) == 0 {
 			return fmt.Sprintf("Spannung wird im %s gespeichert (%d Ladung).", name, tile.StoredVoltage)
 		}
-		if len(emitted) > 0 {
-			return fmt.Sprintf("%s ist voll — Spannungs-Spike in Richtung %s.", name, dirName(emitted[0].Dir))
+		if len(released) > 0 {
+			return fmt.Sprintf("%s ist voll — Spannungs-Spike in Richtung %s.", name, dirName(released[0].Dir))
 		}
 
 	case field.Superconductor:
-		if len(emitted) == 1 {
-			return fmt.Sprintf("Spannung teleportiert über Supraleiter und fliegt in Richtung %s weiter.", dirName(emitted[0].Dir))
+		if len(released) == 1 {
+			return fmt.Sprintf("Spannung teleportiert über Supraleiter und fliegt in Richtung %s weiter.", dirName(released[0].Dir))
 		}
 	}
 
-	if len(emitted) > 0 {
+	if len(released) > 0 {
 		return fmt.Sprintf(
 			"%s trifft %s. %s",
-			incoming, name, formatDirRolls(emitted),
+			incoming, name, formatDirRolls(released),
 		)
 	}
 	if tile.BurnedOut {
@@ -363,26 +376,6 @@ func chipAccusative(t ChipType) string {
 	}
 }
 
-func chipIgniterPickup(t ChipType) string {
-	switch t {
-	case ChipNeutron:
-		return "ein Neutron"
-	case ChipVoltage:
-		return "einen Spannungs-Chip"
-	default:
-		return "einen Wärme-Chip"
-	}
-}
-
-func chipIgniterPronoun(t ChipType) string {
-	switch t {
-	case ChipNeutron:
-		return "es"
-	default:
-		return "ihn"
-	}
-}
-
 func fieldShortName(t field.Type) string {
 	switch t {
 	case field.CoalChamber:
@@ -460,6 +453,11 @@ func narrateWireField(incoming, fieldName string, chip Chip, emitted Chip) strin
 		return fmt.Sprintf("%s fliegt durch %s in Richtung %s.", incoming, fieldName, dirName(emitted.Dir))
 	}
 	return fmt.Sprintf("%s trifft %s und wird in Richtung %s gelenkt.", incoming, fieldName, dirName(emitted.Dir))
+}
+
+func wireEmittedChip(chip Chip, tile field.Tile) Chip {
+	incoming := (chip.Dir + 3) % 6
+	return Chip{Type: chip.Type, Dir: tile.Orientation.WireOutgoing(incoming)}
 }
 
 func isVoluntarySource(t field.Type) bool {

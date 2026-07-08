@@ -37,6 +37,7 @@ func (z Zone) String() string {
 type State struct {
 	Tiles   [hex.Cols][hex.Rows]field.Tile
 	Demands map[hex.Coord][4]int
+	Damage  [4]int // per Zone: accumulated Schadens-Chips
 }
 
 func NewEmpty() *State {
@@ -118,5 +119,6 @@ func (s *State) Clone() *State {
 			c.Demands[coord] = zones
 		}
 	}
+	c.Damage = s.Damage
 	return c
 }

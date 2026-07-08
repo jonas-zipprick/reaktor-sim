@@ -11,54 +11,9 @@ import (
 	"github.com/jonas/reaktor-sim/internal/hex"
 )
 
-// WriteBoardText saves an ASCII grid view of the board.
-func WriteBoardText(state *board.State, path string) error {
-	var b strings.Builder
-	b.WriteString("Spielfeld (Spalten 1-9, Zeilen 1-3)\n\n")
-	b.WriteString("      1  2  3  4  5  |  6  7  8  9\n")
-
-	for r := 0; r < hex.Rows; r++ {
-		if r&1 == 0 {
-			b.WriteString("   ")
-		}
-		b.WriteString(fmt.Sprintf("r%d ", r+1))
-		for q := 0; q < hex.Cols; q++ {
-			c := hex.Coord{Q: q, R: r}
-			sep := " "
-			if q == hex.Player2MinCol {
-				sep = "|"
-			}
-			if !c.Valid() {
-				b.WriteString(sep + "  ")
-				continue
-			}
-			sym := Label(state, c)
-			if sym == "" {
-				b.WriteString(sep + "  ")
-				continue
-			}
-			if ch := ChargeLabel(state.Tiles[c.Q][c.R]); ch != "" {
-				sym += ":" + ch
-			}
-			b.WriteString(sep + sym + " ")
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString(fmt.Sprintf("\nKosten: %s (gesamt %d Geld)\n", state.PlayerCosts().String(), state.TotalCost()))
-	if lines := DemandSummaryLines(state); len(lines) > 0 {
-		b.WriteString("\nVerbleibender Bedarf (Rand):\n")
-		for _, line := range lines {
-			b.WriteString("  " + line + "\n")
-		}
-	}
-	b.WriteString("\n")
-	for _, line := range Legend() {
-		b.WriteString(line + "\n")
-	}
-	b.WriteString("Rand-Bedarf ausserhalb: I oben  W rechts  b unten  R oben (Turbine)\n")
-
-	return os.WriteFile(path, []byte(b.String()), 0o644)
+// WriteBoardYAML saves structured board state for downstream tooling.
+func WriteBoardYAML(state *board.State, path string) error {
+	return writeYAML(path, buildBoardYAML(state))
 }
 
 // WriteGraphText saves a textual edge list of the flow graph.
@@ -115,7 +70,7 @@ func WriteAll(state *board.State, outDir string, view ChipView) error {
 		name string
 	}{
 		{func() error { return WriteBoardPNG(state, filepath.Join(outDir, "spielfeld.png"), view) }, "spielfeld.png"},
-		{func() error { return WriteBoardText(state, filepath.Join(outDir, "spielfeld.txt")) }, "spielfeld.txt"},
+		{func() error { return WriteBoardYAML(state, filepath.Join(outDir, "spielfeld.yaml")) }, "spielfeld.yaml"},
 	}
 	for _, f := range files {
 		if err := f.fn(); err != nil {

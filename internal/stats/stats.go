@@ -18,6 +18,8 @@ type Report struct {
 	HeatAtTurbine    Histogram
 	ZoneHistograms   map[board.Zone]Histogram
 	CriticalFailRate float64
+	CriticalP1Rate   float64
+	CriticalP2Rate   float64
 }
 
 // Build aggregates simulation results into histograms.
@@ -33,6 +35,8 @@ func Build(costs board.PlayerCosts, results []sim.Result) Report {
 		zoneCounts[i] = make(map[int]int)
 	}
 	critical := 0
+	criticalP1 := 0
+	criticalP2 := 0
 
 	for _, r := range results {
 		heatCounts[r.HeatAtTurbine]++
@@ -42,6 +46,12 @@ func Build(costs board.PlayerCosts, results []sim.Result) Report {
 		if r.CriticalFailure {
 			critical++
 		}
+		if r.CriticalP1 {
+			criticalP1++
+		}
+		if r.CriticalP2 {
+			criticalP2++
+		}
 	}
 
 	report := Report{
@@ -50,6 +60,8 @@ func Build(costs board.PlayerCosts, results []sim.Result) Report {
 		HeatAtTurbine:    normalize(heatCounts, runs),
 		ZoneHistograms:   make(map[board.Zone]Histogram, 4),
 		CriticalFailRate: float64(critical) / float64(runs),
+		CriticalP1Rate:   float64(criticalP1) / float64(runs),
+		CriticalP2Rate:   float64(criticalP2) / float64(runs),
 	}
 	for z := board.Zone(0); int(z) < 4; z++ {
 		report.ZoneHistograms[z] = normalize(zoneCounts[z], runs)

@@ -32,11 +32,11 @@ func TestStepLimitAbortsRun(t *testing.T) {
 	}
 }
 
-func TestDefaultMaxStepsIs100(t *testing.T) {
+func TestDefaultMaxStepsIs400(t *testing.T) {
 	if sim.DefaultConfig().MaxSteps != sim.MaxStepsPerRun {
 		t.Fatalf("default MaxSteps = %d, want %d", sim.DefaultConfig().MaxSteps, sim.MaxStepsPerRun)
 	}
-	if sim.MaxStepsPerRun != 100 {
-		t.Fatalf("MaxStepsPerRun = %d, want 100", sim.MaxStepsPerRun)
+	if sim.MaxStepsPerRun != 400 {
+		t.Fatalf("MaxStepsPerRun = %d, want 400", sim.MaxStepsPerRun)
 	}
 }

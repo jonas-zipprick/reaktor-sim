@@ -53,7 +53,7 @@ func TestTraceNarrativeStartUsesDisplayDir(t *testing.T) {
 	}
 }
 
-func TestZuenderAbprallerNarrativeIncludesDirection(t *testing.T) {
+func TestZuenderTrefferNarrative(t *testing.T) {
 	s := board.NewEmpty()
 	cfg := sim.DefaultConfig()
 	cfg.InitialHeat = 0
@@ -66,22 +66,13 @@ func TestZuenderAbprallerNarrativeIncludesDirection(t *testing.T) {
 
 	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
 	for _, snap := range snaps {
-		if snap.Event != "Zuender-Abpraller" {
+		if snap.Event != "Zuender-Treffer" {
 			continue
 		}
-		if !strings.Contains(snap.Narrative, "wieder in Richtung") {
-			t.Fatalf("expected direction in narrative, got %q", snap.Narrative)
+		if !strings.Contains(snap.Narrative, "Zünder") || !strings.Contains(snap.Narrative, "vernichtet") {
+			t.Fatalf("narrative = %q", snap.Narrative)
 		}
-		if strings.Contains(snap.Narrative, "Wärme-Chip") {
-			for _, rot := range hex.ShootRotations {
-				if strings.Contains(snap.Narrative, "Richtung "+rot.String()+" ") ||
-					strings.HasSuffix(snap.Narrative, "Richtung "+rot.String()+" ab.") {
-					return
-				}
-			}
-			t.Fatalf("narrative has invalid shoot direction: %q", snap.Narrative)
-		}
-		t.Fatalf("expected Wärme-Chip mention, got %q", snap.Narrative)
+		return
 	}
-	t.Fatal("no Zuender-Abpraller event in trace")
+	t.Fatal("no Zuender-Treffer event in trace")
 }

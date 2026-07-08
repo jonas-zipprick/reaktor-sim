@@ -25,17 +25,21 @@ var demandSides = []demandSide{
 	{board.ZonePlant, plantDemandAnchor},
 }
 
-// drawDemandOutside renders remaining shift demand totals beside the hex grid.
+// drawDemandOutside renders remaining shift demand and damage totals beside the grid.
 func drawDemandOutside(img *image.RGBA, state *board.State, ly layout, yOffset int) {
 	for _, side := range demandSides {
 		pos := side.anchor(ly)
 		pos.Y += yOffset
-		drawDemandBadge(img, pos, board.ZoneLetter(side.zone), state.TotalDemand(side.zone))
+		drawZoneBadge(img, pos, board.ZoneLetter(side.zone),
+			state.TotalDemand(side.zone), state.TotalDamage(side.zone))
 	}
 }
 
-func drawDemandBadge(img *image.RGBA, center image.Point, letter string, count int) {
-	label := fmt.Sprintf("%s%d", letter, count)
+func drawZoneBadge(img *image.RGBA, center image.Point, letter string, demand, damage int) {
+	label := fmt.Sprintf("%s%d", letter, demand)
+	if damage > 0 {
+		label += fmt.Sprintf(" !%d", damage)
+	}
 	w := len(ASCII(label))*7 + 8
 	h := 18
 	x0 := center.X - w/2
@@ -131,16 +135,20 @@ func anchorBelow(ly layout, cells []hex.Coord) image.Point {
 	return image.Pt(sumX/n, maxY+demandOffset(1.15))
 }
 
-// DemandSummaryLines returns remaining demand per zone for text output.
+// DemandSummaryLines returns remaining demand and damage per zone for text output.
 func DemandSummaryLines(state *board.State) []string {
-	lines := make([]string, 0, 4)
+	lines := make([]string, 0, 8)
 	for _, z := range []board.Zone{
 		board.ZoneIndustry,
 		board.ZoneResidential,
 		board.ZoneRail,
 		board.ZonePlant,
 	} {
-		lines = append(lines, fmt.Sprintf("%s %s: %d", board.ZoneLetter(z), z.String(), state.TotalDemand(z)))
+		line := fmt.Sprintf("%s %s: Bedarf %d", board.ZoneLetter(z), z.String(), state.TotalDemand(z))
+		if d := state.TotalDamage(z); d > 0 {
+			line += fmt.Sprintf(", Schaden %d", d)
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }

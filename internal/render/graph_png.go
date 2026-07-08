@@ -30,7 +30,7 @@ func WriteGraphPNG(state *board.State, g *graph.Graph, path string, caption stri
 	minWidth := ly.width
 	legendLines := []string{
 		legend1, legend2, legend3, legend4,
-		"Rand-Bedarf ausserhalb des Feldes: I/W/b/R + Zahl",
+		"Rand-Bedarf ausserhalb des Feldes: I/W/b/R + Zahl (!n = Schaden)",
 		fmt.Sprintf("%d Knoten, Kanten mit P >= %.0f%%", len(g.Nodes), minEdgeProb*100),
 	}
 	for _, leg := range legendLines {

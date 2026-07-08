@@ -19,6 +19,20 @@ func BuildFlow(state *board.State, chips []InFlight) *Graph {
 	g := &Graph{Nodes: make(map[hex.Coord]Node)}
 
 	for _, chip := range chips {
+		tile := state.Tiles[chip.Pos.Q][chip.Pos.R]
+		if isWireField(tile.Type) {
+			// Chips waiting on mirror/relay depart next step; reflection edges come from approach paths.
+			continue
+		}
+		target := chip.Pos.Neighbor(chip.Dir)
+		if target.Valid() {
+			targetTile := state.Tiles[target.Q][target.R]
+			if isWireField(targetTile.Type) && wireParticleMatches(targetTile.Type, chip.Particle) {
+				addFlowChip(g, chip)
+				addWireReflectEdge(g, state, chip, target)
+				continue
+			}
+		}
 		addFlowChip(g, chip)
 	}
 
@@ -26,6 +40,52 @@ func BuildFlow(state *board.State, chips []InFlight) *Graph {
 	ensureNodes(g, state)
 	normalizeNodeEdges(g)
 	return g
+}
+
+func isWireField(t field.Type) bool {
+	return t == field.Mirror || t == field.Relay
+}
+
+func wireParticleMatches(t field.Type, pt ParticleType) bool {
+	switch t {
+	case field.Mirror:
+		return pt == Heat || pt == Neutron
+	case field.Relay:
+		return pt == Voltage
+	default:
+		return false
+	}
+}
+
+func addWireReflectEdge(g *Graph, state *board.State, chip InFlight, wire hex.Coord) {
+	tile := &state.Tiles[wire.Q][wire.R]
+	incoming := (chip.Dir + 3) % 6
+	outDir := tile.Orientation.WireOutgoing(incoming)
+	outNext := wire.Neighbor(outDir)
+	// A mirror deflecting a heat chip into an adjacent outer wall bounces it
+	// back through the mirror, which deflects it again.
+	if !hex.CanEnter(wire, outNext) && chip.Particle == Heat &&
+		hex.BlockedBoundary(wire, outNext, outDir) == hex.BoundaryOuter && wire.IsPlayer1() {
+		bounced := (hex.ReflectOffOuterWall(outDir) + 3) % 6
+		outDir = tile.Orientation.WireOutgoing(bounced)
+		outNext = wire.Neighbor(outDir)
+	}
+	if !hex.CanEnter(wire, outNext) {
+		return
+	}
+	node := g.Nodes[wire]
+	node.Coord = wire
+	ro := rawOut{to: outNext}
+	switch chip.Particle {
+	case Heat:
+		ro.heat = 1
+	case Neutron:
+		ro.neutron = 1
+	case Voltage:
+		ro.voltage = 1
+	}
+	mergeEdge(&node, ro)
+	g.Nodes[wire] = node
 }
 
 // Build is an alias for BuildPotential (static topology when every field is stimulated).
@@ -109,6 +169,7 @@ func flowTarget(from hex.Coord, dir int, particle ParticleType) (hex.Coord, bool
 			if !from.IsPlayer2() {
 				return hex.Coord{}, false
 			}
+			return hex.Coord{}, false
 		default:
 			return hex.Coord{}, false
 		}

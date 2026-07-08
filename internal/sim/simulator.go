@@ -28,14 +28,20 @@ type Chip struct {
 }
 
 // MaxStepsPerRun is the hard cap on chip resolutions per simulation run.
-const MaxStepsPerRun = 100
+const MaxStepsPerRun = 400
 
 // Result holds metrics from one simulation run.
 type Result struct {
 	HeatAtTurbine     int
 	ZoneDeliveries    [4]int
 	CriticalFailure   bool
+	CriticalP1        bool // critical mass on player 1 (reactor) side
+	CriticalP2        bool // critical mass on player 2 (grid) side
 	StepLimitExceeded bool
+	AllDemandsMet     bool
+	EndDemands        [4]int // remaining demand per board.Zone at run end
+	EndDamage         [4]int // remaining damage per board.Zone at run end
+	Shift             int // energy-card shift used for this run (1-5)
 }
 
 // Snapshot captures board and graph state after a simulation step.
@@ -90,6 +96,7 @@ type engine struct {
 	lastResolved Chip
 	hasResolved  bool
 	lostRecorded bool
+	lastEmitted  []Chip // chips released by the latest fuel/cascade reaction
 }
 
 // Run executes one full shift simulation on a board clone.
@@ -110,7 +117,10 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 		rng:   rng,
 		cfg:   cfg,
 	}
-	e.board.ApplyDemands(cfg.demandsForRun(e.rng))
+	shift, demands := cfg.runShiftAndDemands(e.rng)
+	e.res.Shift = shift
+	e.board.Demands = make(map[hex.Coord][4]int)
+	e.board.ApplyDemands(demands)
 	e.queue = make([]Chip, 0, 64)
 	e.queue = append(e.queue, EmitterChips(cfg, e.rng)...)
 	e.queue = append(e.queue, cfg.InitialChips...)
@@ -118,6 +128,7 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 
 	e.record("Start")
 	if e.checkCritical() {
+		e.captureEndState()
 		return e.res, finalizeTrace(e.trace)
 	}
 	for !e.res.CriticalFailure && e.step < cfg.MaxSteps {
@@ -144,8 +155,17 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 	if !e.res.CriticalFailure && !e.res.StepLimitExceeded {
 		e.record("Ende")
 	}
+	e.res.AllDemandsMet = AllDemandsMet(e.board)
+	e.captureEndState()
 
 	return e.res, finalizeTrace(e.trace)
+}
+
+func (e *engine) captureEndState() {
+	for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
+		e.res.EndDemands[z] = e.board.TotalDemand(z)
+		e.res.EndDamage[z] = e.board.TotalDamage(z)
+	}
 }
 
 func finalizeTrace(snaps []Snapshot) []Snapshot {
@@ -179,14 +199,14 @@ func (e *engine) recordWithActive(event string, active *Chip) {
 	}
 	var narrative string
 	if event == "Start" || event == "verloren" || event == "Schrittlimit" || event == "Ende" {
-		narrative = narrate(event, nil, e.board, queue)
+		narrative = narrate(event, active, e.board, queue, nil)
 	} else if active != nil {
-		narrative = narrate(event, active, e.board, queue)
+		narrative = narrate(event, active, e.board, queue, e.lastEmitted)
 	} else if e.hasResolved {
 		c := e.lastResolved
-		narrative = narrate(event, &c, e.board, queue)
+		narrative = narrate(event, &c, e.board, queue, e.lastEmitted)
 	} else {
-		narrative = narrate(event, nil, e.board, queue)
+		narrative = narrate(event, nil, e.board, queue, nil)
 	}
 	e.trace = append(e.trace, Snapshot{
 		Step:      e.step,
@@ -214,13 +234,15 @@ func (e *engine) recordStep(event string, active *Chip) {
 	e.recordWithActive(event, active)
 }
 
-func (e *engine) loseGame() {
+func (e *engine) loseGame(p1, p2 bool) {
 	if e.lostRecorded {
 		e.res.CriticalFailure = true
 		e.queue = nil
 		return
 	}
 	e.res.CriticalFailure = true
+	e.res.CriticalP1 = p1
+	e.res.CriticalP2 = p2
 	e.queue = nil
 	e.lostRecorded = true
 	e.record("verloren")
@@ -237,10 +259,11 @@ func (e *engine) checkCritical(inFlight ...Chip) bool {
 		e.queue = nil
 		return true
 	}
-	if !criticalExceeded(e.board, e.queue, inFlight, e.cfg.CriticalLimit) {
+	p1, p2 := criticalSidesExceeded(e.board, e.queue, inFlight, e.cfg.CriticalLimit)
+	if !p1 && !p2 {
 		return false
 	}
-	e.loseGame()
+	e.loseGame(p1, p2)
 	return true
 }
 
@@ -280,8 +303,7 @@ func (e *engine) resolve(chip Chip) {
 	nextPos := chip.Pos.Neighbor(chip.Dir)
 
 	if nextPos.IsEmitter() {
-		e.queue = append(e.queue, e.deflectEmitter(chip)...)
-		e.recordStep("Zuender-Abpraller", nil)
+		e.recordStep("Zuender-Treffer", &chip)
 		return
 	}
 
@@ -307,6 +329,7 @@ func (e *engine) resolve(chip Chip) {
 		return
 	}
 
+	chargeBefore := tile.Charge
 	incoming := (chip.Dir + 3) % 6
 
 	destroyedEmergencyGen := tile.Type == field.EmergencyGenerator && chip.Type == ChipVoltage
@@ -315,7 +338,13 @@ func (e *engine) resolve(chip Chip) {
 		e.purgeChipsAt(nextPos)
 		newChips = nil
 		graphChanged = true
+		e.lastEmitted = nil
 	} else {
+		if chargeBefore > tile.Charge && isFuelEmitter(tile.Type) && chip.Type == chipTypeForFuel(tile.Type) {
+			e.lastEmitted = newChips
+		} else {
+			e.lastEmitted = nil
+		}
 		e.queue = append(e.queue, newChips...)
 	}
 	if graphChanged {
@@ -326,6 +355,20 @@ func (e *engine) resolve(chip Chip) {
 		event = "Notgenerator zerstoert"
 	}
 	e.recordStep(event, &chip)
+}
+
+// reflectOffWall bounces a heat chip off the outer wall. If the chip sits on a
+// mirror, the bounce re-enters the mirror from the wall edge and is deflected
+// again (chips fly in straight lines, walls reflect at the same angle), so a
+// chip a mirror sends into an adjacent wall is routed back the way it came.
+func (e *engine) reflectOffWall(pos hex.Coord, dir int) int {
+	reflected := hex.ReflectOffOuterWall(dir)
+	tile := &e.board.Tiles[pos.Q][pos.R]
+	if tile.Type == field.Mirror && !tile.BurnedOut {
+		incoming := (reflected + 3) % 6
+		return tile.Orientation.WireOutgoing(incoming)
+	}
+	return reflected
 }
 
 func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
@@ -345,7 +388,7 @@ func (e *engine) handleOuterBoundary(chip Chip) {
 			reflected := Chip{
 				Type: ChipHeat,
 				Pos:  chip.Pos,
-				Dir:  hex.ReflectOffOuterWall(chip.Dir),
+				Dir:  e.reflectOffWall(chip.Pos, chip.Dir),
 			}
 			e.queue = append(e.queue, reflected)
 			e.recordStep("Waerme-Reflektion", &reflected)
@@ -363,15 +406,11 @@ func (e *engine) handleOuterBoundary(chip Chip) {
 			e.recordStep(board.BorderDemandEvent(z), &chip)
 			return
 		}
-		reflected := Chip{
-			Type: ChipVoltage,
-			Pos:  chip.Pos,
-			Dir:  hex.ReflectOffOuterWall(chip.Dir),
+		if z, ok := e.board.AddWallDamage(chip.Pos, chip.Dir, e.rng); ok {
+			e.recordStep(board.BorderDamageEvent(z), &chip)
+			return
 		}
-		e.queue = append(e.queue, reflected)
-		e.lastResolved = reflected
-		e.hasResolved = true
-		e.recordStep("Spannungs-Spike", nil)
+		e.recordStep("Spannung verpufft", &chip)
 	}
 }
 
@@ -390,14 +429,6 @@ func (e *engine) tryPlantDemand() bool {
 		return true
 	}
 	return false
-}
-
-func (e *engine) deflectEmitter(chip Chip) []Chip {
-	return []Chip{{
-		Type: chip.Type,
-		Pos:  hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow},
-		Dir:  hex.RandomShootDir(e.rng),
-	}}
 }
 
 func shootDir(cfg Config, rng *rand.Rand) int {
@@ -493,20 +524,21 @@ func looseChipsOnSide(b *board.State, chips []Chip, player1 bool) int {
 		}
 	}
 	if !player1 {
-		for _, c := range hex.AllBoardCoords {
-			if !c.IsPlayer2() {
-				continue
-			}
-			count += b.Tiles[c.Q][c.R].StoredVoltage
-		}
+		// Schadens-Chips are geloest; StoredVoltage in Speichern is gebunden until fired.
+		count += b.TotalPlayer2Damage()
 	}
 	return count
 }
 
-func criticalExceeded(b *board.State, queue []Chip, inFlight []Chip, limit int) bool {
+func criticalSidesExceeded(b *board.State, queue []Chip, inFlight []Chip, limit int) (p1, p2 bool) {
 	chips := append(append([]Chip{}, queue...), inFlight...)
-	return looseChipsOnSide(b, chips, true) > limit ||
+	return looseChipsOnSide(b, chips, true) > limit,
 		looseChipsOnSide(b, chips, false) > limit
+}
+
+func criticalExceeded(b *board.State, queue []Chip, inFlight []Chip, limit int) bool {
+	p1, p2 := criticalSidesExceeded(b, queue, inFlight, limit)
+	return p1 || p2
 }
 
 func (e *engine) processTurbine(chip Chip) (event string, active *Chip) {
@@ -524,15 +556,8 @@ func (e *engine) processTurbine(chip Chip) (event string, active *Chip) {
 		if e.tryPlantDemand() {
 			return board.BorderDemandEvent(board.ZonePlant), &chip
 		}
-		spiked := Chip{
-			Type: ChipVoltage,
-			Pos:  tCoord,
-			Dir:  hex.RandomShootDir(e.rng),
-		}
-		e.queue = append(e.queue, spiked)
-		e.lastResolved = spiked
-		e.hasResolved = true
-		return "Spannungs-Spike", nil
+		e.board.AddZoneDamage(board.ZonePlant)
+		return board.BorderDamageEvent(board.ZonePlant), &chip
 	default:
 		return "Turbine", &chip
 	}
@@ -576,20 +601,10 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return passThrough(chip, pos), false
 
 	case field.CoalChamber:
-		return handleFuel(tile, chip, pos, rng, 1, 2, ChipHeat, func(t *field.Tile) {
-			t.Charge--
-			if t.Charge <= 0 {
-				t.BurnedOut = true
-			}
-		})
+		return handleFuel(tile, chip, pos, rng, 1, 2, ChipHeat)
 
 	case field.GasBoiler:
-		return handleFuel(tile, chip, pos, rng, 3, 4, ChipHeat, func(t *field.Tile) {
-			t.Charge -= 3
-			if t.Charge <= 0 {
-				t.BurnedOut = true
-			}
-		})
+		return handleFuel(tile, chip, pos, rng, 3, 4, ChipHeat)
 
 	case field.UraniumPlate:
 		if tile.BurnedOut {
@@ -622,12 +637,7 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return nil, false
 
 	case field.Transformer:
-		return handleFuel(tile, chip, pos, rng, 1, 2, ChipVoltage, func(t *field.Tile) {
-			t.Charge--
-			if t.Charge <= 0 {
-				t.BurnedOut = true
-			}
-		})
+		return handleFuel(tile, chip, pos, rng, 1, 2, ChipVoltage)
 
 	case field.Ground:
 		if chip.Type != ChipVoltage || tile.Charge <= 0 {
@@ -644,12 +654,7 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return nil, false
 
 	case field.HVCascade:
-		return handleFuel(tile, chip, pos, rng, 3, 4, ChipVoltage, func(t *field.Tile) {
-			t.Charge -= 3
-			if t.Charge <= 0 {
-				t.BurnedOut = true
-			}
-		})
+		return handleFuel(tile, chip, pos, rng, 3, 4, ChipVoltage)
 
 	case field.CapacitorBank, field.PumpedStorage, field.LeadAccumulator:
 		if chip.Type != ChipVoltage {
@@ -687,22 +692,53 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 	return passThrough(chip, pos), false
 }
 
-func handleFuel(tile *field.Tile, chip Chip, pos hex.Coord, rng *rand.Rand, cost, emit int, required ChipType, consume func(*field.Tile)) ([]Chip, bool) {
-	changed := false
+func handleFuel(tile *field.Tile, chip Chip, pos hex.Coord, rng *rand.Rand, cost, emit int, required ChipType) ([]Chip, bool) {
 	if tile.BurnedOut {
 		return nil, false
 	}
 	if chip.Type != required {
 		return passThrough(chip, pos), false
 	}
-	if tile.Charge < cost {
+	fromCharge := cost
+	if tile.Charge < fromCharge {
+		fromCharge = tile.Charge
+	}
+	if fromCharge == 0 {
 		return passThrough(chip, pos), false
 	}
-	consume(tile)
-	if tile.BurnedOut {
+	totalEmit := 1 + fromCharge
+	if totalEmit > emit {
+		totalEmit = emit
+	}
+	tile.Charge -= fromCharge
+	changed := false
+	if tile.Charge <= 0 {
+		tile.BurnedOut = true
 		changed = true
 	}
-	return emitRandom(pos, rng, required, emit), changed
+	out := make([]Chip, 0, totalEmit)
+	for i := 0; i < totalEmit; i++ {
+		out = append(out, Chip{Type: required, Pos: pos, Dir: hex.RandomTravelDir(rng)})
+	}
+	return out, changed
+}
+
+func isFuelEmitter(t field.Type) bool {
+	switch t {
+	case field.CoalChamber, field.GasBoiler, field.Transformer, field.HVCascade:
+		return true
+	default:
+		return false
+	}
+}
+
+func chipTypeForFuel(t field.Type) ChipType {
+	switch t {
+	case field.Transformer, field.HVCascade:
+		return ChipVoltage
+	default:
+		return ChipHeat
+	}
 }
 
 func emitRandom(pos hex.Coord, rng *rand.Rand, ct ChipType, n int) []Chip {
@@ -714,17 +750,71 @@ func emitRandom(pos hex.Coord, rng *rand.Rand, ct ChipType, n int) []Chip {
 }
 
 // RunMonteCarlo runs many simulations and returns individual results.
-func RunMonteCarlo(state *board.State, runs int, rng *rand.Rand, cfg Config) []Result {
+// Each run uses an independent RNG seeded with baseSeed+runIndex (1-based),
+// matching -trace and -trace-loop reproducibility.
+func RunMonteCarlo(state *board.State, runs int, baseSeed int64, cfg Config) []Result {
 	results := make([]Result, runs)
 	for i := 0; i < runs; i++ {
-		results[i] = Run(state, rng, cfg)
+		runRNG := rand.New(rand.NewSource(baseSeed + int64(i+1)))
+		results[i] = Run(state, runRNG, cfg)
 	}
 	return results
 }
 
-func (cfg Config) demandsForRun(rng *rand.Rand) board.ShiftDemands {
+// AllDemandsMet reports whether no demand chips remain on the board.
+func AllDemandsMet(s *board.State) bool {
+	for _, z := range []board.Zone{
+		board.ZoneIndustry,
+		board.ZoneResidential,
+		board.ZoneRail,
+		board.ZonePlant,
+	} {
+		if s.TotalDemand(z) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// LoopTraceRunIndices returns 1-based Monte-Carlo run numbers for results that
+// hit the step limit, at most max traces.
+func LoopTraceRunIndices(results []Result, max int) []int {
+	return traceRunIndices(results, max, func(r Result) bool { return r.StepLimitExceeded })
+}
+
+// WinTraceRunIndices returns 1-based Monte-Carlo run numbers for results where
+// all demands were fulfilled, at most max traces.
+func WinTraceRunIndices(results []Result, max int) []int {
+	return traceRunIndices(results, max, func(r Result) bool { return r.AllDemandsMet })
+}
+
+func traceRunIndices(results []Result, max int, match func(Result) bool) []int {
+	if max <= 0 || len(results) == 0 {
+		return nil
+	}
+	out := make([]int, 0, max)
+	for i, res := range results {
+		if !match(res) {
+			continue
+		}
+		out = append(out, i+1)
+		if len(out) >= max {
+			break
+		}
+	}
+	return out
+}
+
+func (cfg Config) runShiftAndDemands(rng *rand.Rand) (int, board.ShiftDemands) {
 	if cfg.EnergyCard.ID == "" {
-		return cfg.ShiftDemands
+		shift := cfg.Shift
+		if shift < 1 {
+			shift = 1
+		}
+		if shift > 5 {
+			shift = 5
+		}
+		return shift, cfg.ShiftDemands
 	}
 	shift := cfg.Shift
 	if cfg.RandomShift && rng != nil {
@@ -736,5 +826,5 @@ func (cfg Config) demandsForRun(rng *rand.Rand) board.ShiftDemands {
 	if shift > 5 {
 		shift = 5
 	}
-	return cfg.EnergyCard.ShiftDemands(shift)
+	return shift, cfg.EnergyCard.ShiftDemands(shift)
 }

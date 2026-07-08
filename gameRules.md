@@ -19,7 +19,7 @@ Das Spiel ist **asymmetrisch**:
 
 ## **2\. Spielaufbau**
 
-* **Der Rahmen:** Das Spiel findet auf einem Hexagon-Raster statt (siehe "Das Spielfeld im Detail"). Links ist die Spielfeldhälfte für Spieler 1, rechts die Spielfeldhälfte für Spieler 2\.  
+* **Der Rahmen:** Das Spiel findet auf einem Hexagon-Raster statt (siehe "Das Spielfeld im Detail"). Links ist die Spielfeldhälfte für Spieler 1, rechts die Spielfeldhälfte für Spieler 2\. Um den Rand von der rechten Hälfte sind Zonen verteilt. Jede Zone hat Bedarfe und Schaden.
 * **Zeit-Slider:** Aufgeteilt in Schicht und Monat. So viele Schichten und Monate habt ihr bereits gespielt  
 * **Geldscheine**: Zum Merken wie viel Budget Spieler 1 und 2 diesen Monat noch zur Verfügung stehen  
 * **Der Ursprung (Reaktor-Emitter):** Am äußersten linken Rand liegt der Zünder. Hier startet in jeder Schicht (Runde) die Kettenreaktion.  
@@ -42,18 +42,18 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 * Die offene **Energie-Karte** gibt den genauen Schichtplan vor, den das Städtische Netz in diesem Monat verlangt, sowie technische Sonderregeln. Schaut auf den Schichtplan, verteilt Bedarfschips auf die Spielfeldränder der Seite des Spielers 2\.  
 * Die offene **Finanz-Karte** gibt an, wie viel **Geld** ihr beide zu Beginn *jeder einzelnen Schicht* dieses Monats erhaltet. (Gespartes Geld aus dem Monat davor verfällt). Nehmt euch die entsprechende Anzahl geldscheine für diesen Monat
 
-**2\. Kaufen & Bauen (Start der Schicht):** Ihr kauft Felder aus dem Markt und legt sie in euer Raster. Schiebt die Geldschieber entsprechend der Kosten nach links. Sobald ein Feld gelegt wird, wird es mit Chips aus dem allgemeinen Vorrat als "Ladung" befüllt.  
+**2\. Kaufen & Bauen (Start der Schicht):** Ihr kauft Felder aus dem Markt und legt sie in euer Raster. Schiebt die Geldschieber entsprechend der Kosten nach links. Sobald ein Feld gelegt wird, wird es mit Chips aus dem allgemeinen Vorrat als "Ladung" befüllt. Spieler 2 kann auch 1 Geld pro Schadenschip ausgeben um Schaden von Zonen zu entfernen.
 **3\. Zünden (Kostenlos):** Spieler 1 feuert am Zünder (am linken Rand) genau **1 Basis-Trigger** (Wärme-Chip oder Neutron) in eine gewählte Richtung ab. Spieler 2 feuert an der Turbine oder befriedigt direkt einen Bedarf im Kraftwerk  
 **4\. Simulation:** Trifft ein fliegender Chip auf ein Feld, passiert Folgendes:
 
 * *Flugbahn:*   
   * Chips fliegen in geraden Linien  
   * Spieler 1: Prallt ein Wärme-Chip gegen die feste Außenwand von Spieler 1 prallt er im gleichen Winkel ab. Andere Chips (Neutronen) verpuffen.  
-  * Spieler 2: Jeder Spannungs-Chip, der einen Rand trifft, verschwindet sofort und vernichtet dort einen Bedarfs-Chip. Ist kein Bedarfschip vorhanden, wird die Spannung zurückreflektiert (Spannungs-Spike\!). Ihr müsst überschüssigen Strom zwingend durch Speicher-Felder, Erdungs-Felder oder andere Ränder vernichten, sonst droht durch die Reflektion sofort die Kritische Masse (\>8 Chips).  
+  * Spieler 2: Jeder Spannungs-Chip, der einen Rand trifft, verschwindet sofort und vernichtet dort einen Bedarfs-Chip. Ist kein Bedarfschip vorhanden, wird der Chip stattdessen auf das Schadensbereich der Zone gelegt. Chips auf den Schadensbereich zählen auch zum Limit von 8 für Spieler 2. Ihr müsst überschüssigen Strom zwingend durch Speicher-Felder, Erdungs-Felder oder andere Ränder vernichten, sonst droht durch die Reflektion sofort die Kritische Masse (\>8 Chips).  
 * *Reaktion:*   
   * *Treffer auf reguläres Feld*: Das Feld löst seinen Effekt aus (z.B. wird zerstört oder 1 Wärme wird zu 2 Wärme). Um das Lösen von Energie darzustellen, wird die richtige Anzahl Chips aus dem Bereich “gebunden” des Feldes in den Bereich “ungebunden” gelegt. Der eingehende Chip landet auch im Bereich “ungebunden”.  
   * *Treffer auf ausgebranntes Feld:* Der Chip verschwindet  
-  * *Treffer auf Zünder*: Der Chip prallt ab. Der Spieler entscheidet wieder die Richtung.  
+  * *Treffer auf Zünder*: Der Chip wird vernichtet. 
   * *Treffer auf Turbine:*   
     * Wärme-Chip: Wird zu einem ungebundenen Spannungs-Chip. Spieler 2 wählt wann und in welche richtung er die Spannungs-Chips abschießt. Sie zählen aber zum 8 Chip Limit und können deshalb nicht endlos aufgestaut werden.  
     * Spannungs-Chip: Zählt wie der Kraftwerk-Spielfeldrand. Verschwindet also und entfernt einen Bedarf.  
@@ -204,8 +204,8 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 8 Chips (auf beiden Sei
 * **Transformator (Kosten: 2 Geld | Ladung: 4 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo vernichtet jeden einkommende Chips  
 * **Erdung / Widerstand (Kosten: 2 Geld | Ladung: 4 Chips):** Leitet eintreffende Spannung ab (vernichtet sie). Verbraucht 1 Ladung. Wichtig bei Überproduktion\!  
 * **Notgenerator (Kosten: 3 Geld | Ladung 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, die Ladung in eine gewünschte Richtung. Trifft ein Spannungs-Chip ein, wird der Generator sofort zerstört. Entferne ihn inklusive aller seiner ladungen sofort.  
+* **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 5 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum Limit von 8 Chips für die linke Spielhälfte.
 * **Blei-Akkumulator (Kosten: 3 Geld | Ladung: Maximal 3 Chip | ab 2\. Monat):** Wie Kondensator-Bank, aber verliert zu Begin der Schicht 1 Chip anstatt geleert zu werden. Bewege einen Chip auf ungebunden. Dieser Chip fliegt unkontrolliert in eine zufällige Richtung. Statt zu explodieren, werden einkommende Ladungschips in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  
-* **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 5 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  
 * **Pumpspeicherwerk (Kosten: 4 Geld | Ladung: Maximal 5 Chips | ab 3\. Monat):** Wie Kondensator-Bank, aber muss beim Schichtwechsel überhaupt nicht geleert werden. Statt zu explodieren, wird Spannung in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  
 * **Hochspannungs-Kaskade (Kosten: 3 Geld | Ladung: 8 Chips | Ab 3\. Monat):** 1 Spannung (hochspannung) trifft ein \-\> verbraucht 3 Ladung \-\> feuert 4 Spannung in zufällige Richtungen ab (niederspannung).  
 * **Supraleiter (Kosten: 4 Geld | ab 4\. Monat):** Zeigt auf einen beliebigen Spielfeldrand. Jede eintreffende Spannung erreicht sofort diesen Rand

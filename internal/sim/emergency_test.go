@@ -2,6 +2,7 @@ package sim_test
 
 import (
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/jonas/reaktor-sim/internal/board"
@@ -29,6 +30,12 @@ func TestEmergencyGeneratorRemovedOnVoltageHit(t *testing.T) {
 	for _, snap := range snaps {
 		if snap.Event == "Notgenerator zerstoert" {
 			destroyed = true
+			if !strings.Contains(snap.Narrative, "den Notgenerator") {
+				t.Fatalf("narrative = %q, want Notgenerator", snap.Narrative)
+			}
+			if strings.Contains(snap.Narrative, "ein Feld") {
+				t.Fatalf("narrative = %q, should not say ein Feld", snap.Narrative)
+			}
 		}
 		if !destroyed {
 			continue

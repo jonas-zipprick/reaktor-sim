@@ -123,7 +123,7 @@ func Legend() []string {
 		"t=Trafo  E=Erdung  N=Notgenerator  B=Blei  Ko=Kondensator  P=Pumpspeicher  H=HV",
 		"Zahl darunter = Ladung gebunden (n/max, *=unendlich)",
 		"+nW/+nN/+nS = ungebunden (Waerme/Neutron/Spannung)  >nW/>nN/>nS = einkommend",
-		"Rand-Bedarf ausserhalb: I oben  W rechts  b unten  R oben (Turbine)",
+		"Rand-Bedarf ausserhalb: I oben  W rechts  b unten  R oben (!n = Schaden)",
 		"| = Schnittstelle (zwischen Spalte 5 und 6)",
 	}
 }

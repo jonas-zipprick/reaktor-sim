@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jonas/reaktor-sim/internal/board"
+	"github.com/jonas/reaktor-sim/internal/field"
 	"github.com/jonas/reaktor-sim/internal/hex"
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
@@ -28,6 +29,12 @@ func TestCriticalMassPerSide(t *testing.T) {
 	if !res.CriticalFailure {
 		t.Fatal("expected critical failure with 9 chips on player 1 side")
 	}
+	if !res.CriticalP1 {
+		t.Fatal("expected critical failure on player 1 side")
+	}
+	if res.CriticalP2 {
+		t.Fatal("did not expect critical failure on player 2 side")
+	}
 	if len(snaps) == 0 || snaps[len(snaps)-1].Event != "verloren" {
 		t.Fatalf("expected final trace event verloren, got %#v", snaps)
 	}
@@ -38,16 +45,24 @@ func TestCriticalMassPerSide(t *testing.T) {
 	}
 }
 
-func TestNineStoredVoltageOnPlayer2Loses(t *testing.T) {
+func TestBoundStoredVoltageDoesNotCountTowardCriticalMass(t *testing.T) {
 	s := board.NewEmpty()
 	s.ApplyDemands(board.ShiftDemands{})
+	s.Tiles[6][1] = field.NewTile(field.CapacitorBank, 0, 0)
 	s.Tiles[6][1].StoredVoltage = 9
 
 	cfg := sim.DefaultConfig()
+	cfg.MixedEmitterTrigger = false
 	cfg.InitialHeat = 0
+	cfg.ShiftDemands = board.ShiftDemands{}
 
-	res := sim.Run(s, rand.New(rand.NewSource(2)), cfg)
-	if !res.CriticalFailure {
-		t.Fatal("expected critical failure with 9 stored voltage on player 2")
+	res, snaps := sim.RunTrace(s, rand.New(rand.NewSource(2)), cfg)
+	if res.CriticalFailure {
+		t.Fatal("bound stored voltage must not count toward critical mass")
+	}
+	for _, snap := range snaps {
+		if snap.Event == "verloren" {
+			t.Fatal("should not lose with only bound storage on the board")
+		}
 	}
 }

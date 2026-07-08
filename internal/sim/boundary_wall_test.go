@@ -10,8 +10,8 @@ import (
 )
 
 // Regression for run2: voltage at (5,2) heading SE hits the Bahn wall (b=0),
-// so it must spike instead of consuming Wohnviertel demand.
-func TestVoltageSEFromBottomRowSpikesWhenRailEmpty(t *testing.T) {
+// so it must add rail damage instead of consuming Wohnviertel demand.
+func TestVoltageSEFromBottomRowDamagesWhenRailEmpty(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Industry: 1, Residential: 1, Plant: 1}
 	cfg.InitialHeat = 0
@@ -26,11 +26,11 @@ func TestVoltageSEFromBottomRowSpikesWhenRailEmpty(t *testing.T) {
 		if snap.Event == board.BorderDemandEvent(board.ZoneResidential) {
 			t.Fatalf("unexpected residential delivery: %s", snap.Narrative)
 		}
-		if snap.Event == "Spannungs-Spike" {
+		if snap.Event == board.BorderDamageEvent(board.ZoneRail) {
 			return
 		}
 	}
-	t.Fatal("expected voltage spike when SE hits Bahn wall with b=0")
+	t.Fatal("expected rail damage when SE hits Bahn wall with b=0")
 }
 
 func TestVoltageSEFromBottomRowConsumesRail(t *testing.T) {

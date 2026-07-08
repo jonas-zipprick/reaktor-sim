@@ -130,7 +130,7 @@ func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOu
 	case field.CoalChamber:
 		return emitterOut(c, 2, 1, 0, tile.Charge > 0)
 	case field.GasBoiler:
-		return emitterOut(c, 4, 1, 0, tile.Charge >= 3)
+		return emitterOut(c, 4, 1, 0, tile.Charge > 0)
 	case field.CoolingTower:
 		return absorb()
 	case field.AbsorberRod:
@@ -152,7 +152,7 @@ func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOu
 	case field.Ground:
 		return absorbVoltage()
 	case field.HVCascade:
-		return emitterOut(c, 0, 0, 4, tile.Charge >= 3)
+		return emitterOut(c, 0, 0, 4, tile.Charge > 0)
 	case field.Superconductor:
 		// Teleport to border in superTarget direction — approximate as neighbor chain.
 		next := c
@@ -214,12 +214,12 @@ func forwardOrReflect(c hex.Coord, incomingDir int, heat, neutron, voltage float
 			h = heat
 		}
 		if voltage > 0 && c.IsPlayer2() {
-			v = voltage
+			return nil
 		}
 		if neutron > 0 {
 			return nil
 		}
-		if h == 0 && v == 0 {
+		if h == 0 {
 			return nil
 		}
 		refDir := hex.ReflectOffOuterWall(incomingDir)

@@ -7,22 +7,31 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
 
-// WriteRunTrace saves trace.txt and one graph PNG per simulation snapshot.
-// trace.txt is written before PNGs so each run folder always has a log even
+// TraceMeta records simulation setup written into trace.yaml.
+type TraceMeta struct {
+	EnergyCardID    string
+	EnergyCardName  string
+	EnergyCardLevel int
+	Shift           int
+	Costs           board.PlayerCosts
+}
+
+// WriteRunTrace saves trace.yaml and one graph PNG per simulation snapshot.
+// trace.yaml is written before PNGs so each run folder always has a log even
 // when image export fails or is interrupted.
-func WriteRunTrace(run int, snaps []sim.Snapshot, outDir string) error {
+func WriteRunTrace(run int, meta TraceMeta, snaps []sim.Snapshot, outDir string) error {
 	runDir := filepath.Join(outDir, fmt.Sprintf("run%d", run))
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return err
 	}
 
-	summary := formatRunTrace(run, snaps)
-	tracePath := filepath.Join(runDir, "trace.txt")
-	if err := os.WriteFile(tracePath, []byte(summary), 0o644); err != nil {
-		return fmt.Errorf("trace.txt: %w", err)
+	tracePath := filepath.Join(runDir, "trace.yaml")
+	if err := writeYAML(tracePath, buildTraceYAML(run, 0, meta, snaps)); err != nil {
+		return fmt.Errorf("trace.yaml: %w", err)
 	}
 
 	var pngErrs []error
@@ -40,55 +49,144 @@ func WriteRunTrace(run int, snaps []sim.Snapshot, outDir string) error {
 	return errors.Join(pngErrs...)
 }
 
-// TraceIndexEntry records one traced Monte-Carlo run.
-type TraceIndexEntry struct {
-	Run   int
-	Steps int
-	Dir   string
+// WriteLoopTrace saves trace.yaml and graph PNGs for a Monte-Carlo run that
+// hit the step limit. loopNum is the sequential loop-trace index (1-based);
+// monteCarloRun is the original Monte-Carlo run number (1-based).
+func WriteLoopTrace(loopNum, monteCarloRun int, meta TraceMeta, snaps []sim.Snapshot, outDir string) error {
+	runDir := filepath.Join(outDir, fmt.Sprintf("loop%d", loopNum))
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return err
+	}
+
+	tracePath := filepath.Join(runDir, "trace.yaml")
+	if err := writeYAML(tracePath, buildTraceYAML(loopNum, monteCarloRun, meta, snaps)); err != nil {
+		return fmt.Errorf("trace.yaml: %w", err)
+	}
+
+	var pngErrs []error
+	for i, snap := range snaps {
+		name := fmt.Sprintf("graph_loop%d_%03d.png", loopNum, i)
+		meta := fmt.Sprintf("Loop-Trace %d | MC-Lauf %d | Schritt %d (Warteschlange: %d)",
+			loopNum, monteCarloRun, snap.Step, snap.QueueSize)
+		caption := ASCII(snap.Narrative) + "\n" + meta
+		if err := WriteGraphPNG(snap.Board, snap.Graph, filepath.Join(runDir, name), caption, ChipView{
+			Queue:  snap.Queue,
+			Active: snap.Active,
+		}); err != nil {
+			pngErrs = append(pngErrs, fmt.Errorf("%s: %w", name, err))
+		}
+	}
+	return errors.Join(pngErrs...)
 }
 
-// WriteTraceIndex lists all trace run folders at outDir/trace_index.txt.
+// WriteWinTrace saves trace.yaml and graph PNGs for a Monte-Carlo run where all
+// demands were fulfilled. winNum is the sequential win-trace index (1-based);
+// monteCarloRun is the original Monte-Carlo run number (1-based).
+func WriteWinTrace(winNum, monteCarloRun int, meta TraceMeta, snaps []sim.Snapshot, outDir string) error {
+	runDir := filepath.Join(outDir, fmt.Sprintf("win%d", winNum))
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return err
+	}
+
+	tracePath := filepath.Join(runDir, "trace.yaml")
+	if err := writeYAML(tracePath, buildTraceYAML(winNum, monteCarloRun, meta, snaps)); err != nil {
+		return fmt.Errorf("trace.yaml: %w", err)
+	}
+
+	var pngErrs []error
+	for i, snap := range snaps {
+		name := fmt.Sprintf("graph_win%d_%03d.png", winNum, i)
+		captionMeta := fmt.Sprintf("Win-Trace %d | MC-Lauf %d | Schritt %d (Warteschlange: %d)",
+			winNum, monteCarloRun, snap.Step, snap.QueueSize)
+		caption := ASCII(snap.Narrative) + "\n" + captionMeta
+		if err := WriteGraphPNG(snap.Board, snap.Graph, filepath.Join(runDir, name), caption, ChipView{
+			Queue:  snap.Queue,
+			Active: snap.Active,
+		}); err != nil {
+			pngErrs = append(pngErrs, fmt.Errorf("%s: %w", name, err))
+		}
+	}
+	return errors.Join(pngErrs...)
+}
+
+// TraceKind labels how a trace was selected in trace_index.yaml.
+type TraceKind string
+
+const (
+	TraceKindFirst TraceKind = "trace-first"
+	TraceKindLoop  TraceKind = "trace-loop"
+	TraceKindWin   TraceKind = "trace-win"
+)
+
+// TraceIndexEntry records one traced Monte-Carlo run.
+type TraceIndexEntry struct {
+	Run           int
+	MonteCarloRun int
+	Kind          TraceKind
+	Steps         int
+	Dir           string
+}
+
+// WriteTraceIndex lists all trace run folders at outDir/trace_index.yaml.
 func WriteTraceIndex(outDir string, entries []TraceIndexEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
-	var b strings.Builder
-	b.WriteString("Trace-Laeufe (output/runN/)\n\n")
-	for _, e := range entries {
-		b.WriteString(fmt.Sprintf("run%d: %d Schritte — %s/trace.txt\n", e.Run, e.Steps, e.Dir))
-	}
-	path := filepath.Join(outDir, "trace_index.txt")
-	return os.WriteFile(path, []byte(b.String()), 0o644)
+	return writeYAML(filepath.Join(outDir, "trace_index.yaml"), buildTraceIndexYAML(entries))
 }
 
-func formatRunTrace(run int, snaps []sim.Snapshot) string {
-	var b strings.Builder
-	b.WriteString(fmt.Sprintf("Run %d – Simulationstrace (%d Schritte)\n", run, len(snaps)))
-	if len(snaps) == 0 {
-		b.WriteString("\nKeine Snapshots aufgezeichnet.\n")
-		return b.String()
-	}
-	if note := traceOutcomeNote(snaps[len(snaps)-1].Event); note != "" {
-		b.WriteString(note + "\n")
-	}
-	b.WriteByte('\n')
-
-	for _, snap := range snaps {
-		meta := fmt.Sprintf("Run %d | Schritt %d (Warteschlange: %d)", run, snap.Step, snap.QueueSize)
-		b.WriteString(ASCII(snap.Narrative) + "\n" + meta + "\n")
-	}
-	return b.String()
-}
-
-func traceOutcomeNote(lastEvent string) string {
+func traceOutcomeNote(lastEvent string, boardState *board.State) string {
+	var base string
 	switch lastEvent {
 	case "verloren":
-		return "Ergebnis: Kritische Masse ueberschritten — Simulation sofort beendet."
+		base = "Kritische Masse ueberschritten — Simulation sofort beendet."
 	case "Schrittlimit":
-		return "Ergebnis: Schrittlimit erreicht — Simulation abgebrochen."
+		base = "Schrittlimit erreicht — Simulation abgebrochen."
 	case "Ende":
-		return "Ergebnis: Schicht normal beendet (Warteschlange leer)."
+		base = "Schicht normal beendet (Warteschlange leer)."
 	default:
 		return ""
 	}
+	if boardState == nil {
+		return base
+	}
+	return base + " Uebrige Bedarfe: " + formatRemainingDemands(boardState) + ". Schaden: " + formatRemainingDamage(boardState) + "."
+}
+
+func formatRemainingDamage(state *board.State) string {
+	zones := []board.Zone{
+		board.ZoneIndustry,
+		board.ZoneResidential,
+		board.ZoneRail,
+		board.ZonePlant,
+	}
+	parts := make([]string, 0, len(zones))
+	for _, z := range zones {
+		if n := state.TotalDamage(z); n > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d", z.String(), n))
+		}
+	}
+	if len(parts) == 0 {
+		return "keiner"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func formatRemainingDemands(state *board.State) string {
+	zones := []board.Zone{
+		board.ZoneIndustry,
+		board.ZoneResidential,
+		board.ZoneRail,
+		board.ZonePlant,
+	}
+	parts := make([]string, 0, len(zones))
+	for _, z := range zones {
+		if n := state.TotalDemand(z); n > 0 {
+			parts = append(parts, fmt.Sprintf("%s=%d", z.String(), n))
+		}
+	}
+	if len(parts) == 0 {
+		return "keine"
+	}
+	return strings.Join(parts, ", ")
 }
