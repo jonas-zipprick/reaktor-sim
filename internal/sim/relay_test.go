@@ -17,7 +17,6 @@ func TestRelayOrientation5PassesVoltageEast(t *testing.T) {
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.Relay, hex.RotW, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 1},
@@ -45,7 +44,6 @@ func TestRelayOrientation0DeflectsWestToSouthwest(t *testing.T) {
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.Relay, hex.RotNW, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 1},

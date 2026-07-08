@@ -17,8 +17,6 @@ func TestMirrorNarrativeIgnoresQueuedChipsOnSameCell(t *testing.T) {
 	s.Tiles[mirror.Q][mirror.R] = field.NewTile(field.Mirror, hex.RotNW, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 1, R: 1},
@@ -54,8 +52,6 @@ func TestMirrorBouncesChipBackOffAdjacentWall(t *testing.T) {
 	s.Tiles[mirror.Q][mirror.R] = field.NewTile(field.Mirror, hex.RotNE, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  origin,

@@ -39,3 +39,16 @@ func TestBorderDamageEvent(t *testing.T) {
 		t.Fatalf("parse %q -> %v %v", got, z, ok)
 	}
 }
+
+func TestRepairRandomDamage(t *testing.T) {
+	s := board.NewEmpty()
+	s.Damage = [4]int{2, 1, 0, 1}
+	rng := rand.New(rand.NewSource(1))
+	spent := s.RepairRandomDamage(rng, 2)
+	if spent != 2 {
+		t.Fatalf("spent = %d, want 2", spent)
+	}
+	if s.TotalPlayer2Damage() != 2 {
+		t.Fatalf("remaining damage = %d, want 2", s.TotalPlayer2Damage())
+	}
+}

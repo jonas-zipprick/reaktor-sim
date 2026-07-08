@@ -12,7 +12,6 @@ import (
 func TestTraceEndsImmediatelyAfterVerloren(t *testing.T) {
 	s := board.NewEmpty()
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = make([]sim.Chip, 9)
 	for i := range cfg.InitialChips {
 		cfg.InitialChips[i] = sim.Chip{

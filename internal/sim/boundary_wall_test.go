@@ -14,7 +14,6 @@ import (
 func TestVoltageSEFromBottomRowDamagesWhenRailEmpty(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Industry: 1, Residential: 1, Plant: 1}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 2},
@@ -36,7 +35,6 @@ func TestVoltageSEFromBottomRowDamagesWhenRailEmpty(t *testing.T) {
 func TestVoltageSEFromBottomRowConsumesRail(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Rail: 1, Residential: 1}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 2},

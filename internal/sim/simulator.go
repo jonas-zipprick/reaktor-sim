@@ -38,10 +38,11 @@ type Result struct {
 	CriticalP1        bool // critical mass on player 1 (reactor) side
 	CriticalP2        bool // critical mass on player 2 (grid) side
 	StepLimitExceeded bool
+	Steps             int // chip resolutions executed in this run
 	AllDemandsMet     bool
 	EndDemands        [4]int // remaining demand per board.Zone at run end
 	EndDamage         [4]int // remaining damage per board.Zone at run end
-	Shift             int // energy-card shift used for this run (1-5)
+	Shift             int    // energy-card shift used for this run (1-5)
 }
 
 // Snapshot captures board and graph state after a simulation step.
@@ -60,14 +61,12 @@ type Snapshot struct {
 type Config struct {
 	MaxSteps      int
 	CriticalLimit int
-	InitialHeat            int
-	InitialNeutron         int
-	MixedEmitterTrigger    bool // one random heat/neutron trigger per run (game rules)
-	StartDir               int // 0-5 travel override for tests, or -1 = random NO/O/SO per chip
+	StartDir      int // 0-5 travel override for tests, or -1 = random NO/O/SO per chip
 	ShiftDemands  board.ShiftDemands
 	EnergyCard    energy.Card // when set, overrides ShiftDemands per run
 	Shift         int         // 1-5 for EnergyCard
 	RandomShift   bool        // pick shift 1-5 per Monte-Carlo run
+	RepairBudget  int         // max money for damage repair per run (1 per chip); 0 = none
 	Trace         bool
 	InitialChips  []Chip
 }
@@ -77,7 +76,6 @@ func DefaultConfig() Config {
 	return Config{
 		MaxSteps:      MaxStepsPerRun,
 		CriticalLimit: 8,
-		InitialHeat:   1,
 		EnergyCard:    card,
 		Shift:         1,
 		ShiftDemands:  card.ShiftDemands(1),
@@ -85,14 +83,14 @@ func DefaultConfig() Config {
 }
 
 type engine struct {
-	board *board.State
-	graph *graph.Graph
-	queue []Chip
-	res   Result
-	rng   *rand.Rand
-	cfg   Config
-	trace []Snapshot
-	step  int
+	board        *board.State
+	graph        *graph.Graph
+	queue        []Chip
+	res          Result
+	rng          *rand.Rand
+	cfg          Config
+	trace        []Snapshot
+	step         int
 	lastResolved Chip
 	hasResolved  bool
 	lostRecorded bool
@@ -117,13 +115,19 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 		rng:   rng,
 		cfg:   cfg,
 	}
+	if cfg.RepairBudget > 0 {
+		e.board.RepairRandomDamage(e.rng, cfg.RepairBudget)
+	}
 	shift, demands := cfg.runShiftAndDemands(e.rng)
 	e.res.Shift = shift
 	e.board.Demands = make(map[hex.Coord][4]int)
 	e.board.ApplyDemands(demands)
 	e.queue = make([]Chip, 0, 64)
-	e.queue = append(e.queue, EmitterChips(cfg, e.rng)...)
-	e.queue = append(e.queue, cfg.InitialChips...)
+	if cfg.InitialChips != nil {
+		e.queue = append(e.queue, cfg.InitialChips...)
+	} else {
+		e.queue = append(e.queue, EmitterChips(e.board, cfg, e.rng)...)
+	}
 	e.graph = graph.BuildFlow(e.board, e.inFlight())
 
 	e.record("Start")
@@ -162,6 +166,7 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 }
 
 func (e *engine) captureEndState() {
+	e.res.Steps = e.step
 	for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
 		e.res.EndDemands[z] = e.board.TotalDemand(z)
 		e.res.EndDamage[z] = e.board.TotalDamage(z)
@@ -374,6 +379,18 @@ func (e *engine) reflectOffWall(pos hex.Coord, dir int) int {
 func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
 	switch kind {
 	case hex.BoundaryInternalWall:
+		// The reactor wall (rows 0/2) is the Reaktoreigenbedarf border. Spannung
+		// can never enter player 1: it vanishes and reduces plant demand, or
+		// damages the plant zone when no demand is left.
+		if chip.Type == ChipVoltage && chip.Pos.IsPlayer2() {
+			if e.tryPlantDemand() {
+				e.recordStep(board.BorderDemandEvent(board.ZonePlant), &chip)
+				return
+			}
+			e.board.AddZoneDamage(board.ZonePlant)
+			e.recordStep(board.BorderDamageEvent(board.ZonePlant), &chip)
+			return
+		}
 		e.recordStep("Innere Wand", &chip)
 		return
 	case hex.BoundaryOuter:
@@ -438,24 +455,23 @@ func shootDir(cfg Config, rng *rand.Rand) int {
 	return hex.RandomShootDir(rng)
 }
 
-// EmitterChips returns chips fired from the igniter at shift start.
-func EmitterChips(cfg Config, rng *rand.Rand) []Chip {
+// EmitterChips returns the chip fired from the igniter at shift start.
+func EmitterChips(state *board.State, cfg Config, rng *rand.Rand) []Chip {
 	pos := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
-	if cfg.MixedEmitterTrigger {
-		ct := ChipHeat
-		if rng.Intn(2) == 1 {
-			ct = ChipNeutron
+	ct := ChipHeat
+	if hasUraniumField(state) && rng.Intn(2) == 1 {
+		ct = ChipNeutron
+	}
+	return []Chip{{Type: ct, Pos: pos, Dir: shootDir(cfg, rng)}}
+}
+
+func hasUraniumField(state *board.State) bool {
+	for _, c := range hex.AllBoardCoords {
+		if state.Tiles[c.Q][c.R].Type == field.UraniumPlate {
+			return true
 		}
-		return []Chip{{Type: ct, Pos: pos, Dir: shootDir(cfg, rng)}}
 	}
-	chips := make([]Chip, 0, cfg.InitialHeat+cfg.InitialNeutron)
-	for i := 0; i < cfg.InitialHeat; i++ {
-		chips = append(chips, Chip{Type: ChipHeat, Pos: pos, Dir: shootDir(cfg, rng)})
-	}
-	for i := 0; i < cfg.InitialNeutron; i++ {
-		chips = append(chips, Chip{Type: ChipNeutron, Pos: pos, Dir: shootDir(cfg, rng)})
-	}
-	return chips
+	return false
 }
 
 func (e *engine) purgeChipsAt(c hex.Coord) {

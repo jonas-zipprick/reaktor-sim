@@ -58,3 +58,36 @@ func (s *State) TotalPlayer2Damage() int {
 	}
 	return total
 }
+
+const repairCostPerChip = 1
+
+// RepairRandomDamage removes damage chips at 1 money each, choosing zones
+// uniformly at random until budget is spent or no damage remains.
+// Returns money spent on repairs.
+func (s *State) RepairRandomDamage(rng *rand.Rand, budget int) int {
+	if budget < repairCostPerChip {
+		return 0
+	}
+	spent := 0
+	for budget >= repairCostPerChip {
+		candidates := zonesWithDamage(s)
+		if len(candidates) == 0 {
+			break
+		}
+		z := candidates[rng.Intn(len(candidates))]
+		s.Damage[int(z)]--
+		budget -= repairCostPerChip
+		spent += repairCostPerChip
+	}
+	return spent
+}
+
+func zonesWithDamage(s *State) []Zone {
+	out := make([]Zone, 0)
+	for z := ZoneIndustry; z <= ZonePlant; z++ {
+		for i := 0; i < s.TotalDamage(z); i++ {
+			out = append(out, z)
+		}
+	}
+	return out
+}

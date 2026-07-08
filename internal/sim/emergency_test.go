@@ -17,7 +17,6 @@ func TestEmergencyGeneratorRemovedOnVoltageHit(t *testing.T) {
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.EmergencyGenerator, 0, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{
 		{Type: sim.ChipVoltage, Pos: hex.Coord{Q: 5, R: 1}, Dir: hex.RotE.TravelDir()},
 		{Type: sim.ChipVoltage, Pos: pos, Dir: hex.RotNE.TravelDir()},
@@ -63,7 +62,6 @@ func TestEmergencyGeneratorBoundChargeRemoved(t *testing.T) {
 	}
 
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 1},

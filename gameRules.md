@@ -193,13 +193,13 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 8 Chips (auf beiden Sei
 * **Kohle-Brennkammer (Kosten: 2 Geld | Ladung: 4 Chips):** 1 Wärme trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Wärme zufällig ab. Vernichtet einkommende Chips im ausgebrannten Zustand.  
 * **Kühlturm (Kosten: 2 Geld | Ladung: Keine):** Vernichtet eintreffende Wärme restlos (Notbremse).  
 * **Erdgas-Kessel (Kosten: 3 Geld | Ladung: 8 Chips | ab 2\. Monat):** 1 Wärme trifft ein \-\> verbraucht 3 Ladung \-\> feuert 4 Wärme ab. Vernichtet einkommende Chips im ausgebrannten Zustand.  
-* **Absorber-Stab (Kosten: 3 Geld | Ladung: Keine):** Vernichtet eintreffende Neutronen restlos.  
+* **Absorber-Stab (Kosten: 3 Geld | Ladung: Keine):** Vernichtet eintreffende Neutronen restlos. Wärme wird in eine zufällige Richtung weitergeleitet. 
 * **Uran-Platte (Kosten: 5 Geld | Ladung: 2 Chips | ab 3\. Monat):** 1 *Neutron* trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Neutronen & 1 Wärme ab. Trifft 1 Wärme ein so wird sie in eine zufällige richtung weitergeschickt.
 * **Tokamak-Kammer (Kosten: 8 Geld | Ladung: Unendlich | ab 4\. Monat):** 4 Neutronen treffen ein \-\> feuert 8 Wärme ab
 
 ## **7\. Sektor 2: Das Stromnetz (Felder für Spieler 2\)**
 
-* **Feld entfernen (Kosten: 1): Entferne ein beliebiges Feld**  
+* **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld  
 * **Relais / Weiche (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Spannung im fixen Winkel ab.  
 * **Transformator (Kosten: 2 Geld | Ladung: 4 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo vernichtet jeden einkommende Chips  
 * **Erdung / Widerstand (Kosten: 2 Geld | Ladung: 4 Chips):** Leitet eintreffende Spannung ab (vernichtet sie). Verbraucht 1 Ladung. Wichtig bei Überproduktion\!  

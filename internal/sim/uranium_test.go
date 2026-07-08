@@ -16,7 +16,6 @@ func TestUraniumEmitsNeutronsOnNeutronHit(t *testing.T) {
 	s.Tiles[uranium.Q][uranium.R] = field.NewTile(field.UraniumPlate, 0, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipNeutron,
 		Pos:  hex.Coord{Q: 1, R: 1},
@@ -49,12 +48,11 @@ func TestUraniumEmitsNeutronsOnNeutronHit(t *testing.T) {
 	}
 }
 
-func TestMixedEmitterCanReachUranium(t *testing.T) {
+func TestIgniterCanFireNeutronWhenUraniumExists(t *testing.T) {
 	s := board.NewEmpty()
 	s.Tiles[1][1] = field.NewTile(field.UraniumPlate, 0, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.MixedEmitterTrigger = true
 	cfg.StartDir = hex.RotE.TravelDir()
 
 	neutronRuns := 0
@@ -62,17 +60,38 @@ func TestMixedEmitterCanReachUranium(t *testing.T) {
 		runCfg := cfg
 		runCfg.Trace = true
 		_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(seed)), runCfg)
-		for _, snap := range snaps {
-			for _, chip := range snap.Queue {
-				if chip.Type == sim.ChipNeutron {
-					neutronRuns++
-					break
-				}
+		if len(snaps) == 0 {
+			continue
+		}
+		for _, chip := range snaps[0].Queue {
+			if chip.Type == sim.ChipNeutron {
+				neutronRuns++
+				break
 			}
 		}
 	}
 	if neutronRuns == 0 {
-		t.Fatal("mixed emitter should produce neutrons when uranium is on path")
+		t.Fatal("igniter should sometimes produce neutrons when uranium exists")
+	}
+}
+
+func TestIgniterNeverFiresNeutronWithoutUranium(t *testing.T) {
+	s := board.NewEmpty()
+	cfg := sim.DefaultConfig()
+	cfg.StartDir = hex.RotE.TravelDir()
+
+	for seed := int64(1); seed < 50; seed++ {
+		runCfg := cfg
+		runCfg.Trace = true
+		_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(seed)), runCfg)
+		if len(snaps) == 0 {
+			t.Fatalf("seed %d: expected start snapshot", seed)
+		}
+		for _, chip := range snaps[0].Queue {
+			if chip.Type == sim.ChipNeutron {
+				t.Fatalf("seed %d: igniter fired neutron without uranium on board", seed)
+			}
+		}
 	}
 }
 
@@ -85,7 +104,6 @@ func TestUraniumDeflectsHeatRandomly(t *testing.T) {
 		s.Tiles[uranium.Q][uranium.R] = field.NewTile(field.UraniumPlate, 0, 0)
 
 		cfg := sim.DefaultConfig()
-		cfg.InitialHeat = 0
 		cfg.InitialChips = []sim.Chip{{
 			Type: sim.ChipHeat,
 			Pos:  hex.Coord{Q: 1, R: 1},

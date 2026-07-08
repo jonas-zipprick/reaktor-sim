@@ -13,7 +13,6 @@ import (
 func TestVoltageAtTurbineConsumesPlantDemand(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 2},

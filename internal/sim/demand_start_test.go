@@ -19,8 +19,7 @@ func TestStartDemandsMatchShiftPlan(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = card
 	cfg.Shift = 1
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
+	cfg.InitialChips = []sim.Chip{}
 
 	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
 	if len(snaps) == 0 || snaps[0].Event != "Start" {
@@ -38,8 +37,7 @@ func TestPreappliedDemandsMustNotBeDoubled(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = card
 	cfg.Shift = 1
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
+	cfg.InitialChips = []sim.Chip{}
 
 	s := board.NewEmpty()
 	s.ApplyDemands(cfg.ShiftDemands)

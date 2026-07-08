@@ -39,7 +39,7 @@ go run ./cmd/sim -runs 20 -out output
 - `spannung_industrie.png` – Spannung am oberen Rand
 - `spannung_bahn.png` – Spannung am unteren Rand
 - `spannung_reaktoreigenbedarf.png` – Spannung am Kraftwerksrand
-- `spielfeld.png` / `spielfeld.txt` – Brettdarstellung mit Symbolen und Bedarfen
+- `spielfeld-<board-fingerprint>.png` / `spielfeld-<board-fingerprint>.yaml` – Brettdarstellung mit Symbolen und Bedarfen
 - `graph.png` / `graph.txt` – Flussgraph (rot=Wärme, grün=Neutron, blau=Spannung)
 - `runN/graph_runN_SSS.png` – Graph pro Simulationsschritt (mit `-trace-first`)
 - `runN/trace.yaml` – Ereignisprotokoll pro Lauf
@@ -55,29 +55,36 @@ Weniger Traces: `-trace-first 5`. Mehr Statistik: `-runs 5000` (ohne Trace-Flags
 
 ## Seed-Suche
 
-Separates Meta-Programm zum Durchprobieren vieler Board-Seeds und Finden von Brettern mit vielen Wins oder Loops:
+Separates Meta-Programm zum Durchprobieren vieler Board-Seeds und Finden guter Bretter. Bedarfe kommen aus dem Schichtplan der **Energie-Karte**, das Schicht-Budget aus der **Finanz-Karte**:
 
 ```bash
 go run ./cmd/seedsearch -from 1 -to 1000 -runs 100 -top 10
 ```
 
-Pro Seed wird ein Brett erzeugt und `-runs` Monte-Carlo-Läufe ausgeführt. Am Ende erscheinen zwei Ranglisten (Top Wins / Top Loops). Optional `-out seeds.yaml` für die vollständigen Ergebnisse.
+Pro Seed wird ein Brett erzeugt (mit dem Schicht-Budget der Finanz-Karte) und `-runs` Monte-Carlo-Läufe ausgeführt. Doppelte Startbretter werden automatisch ausgefiltert. Am Ende erscheinen pro Schicht mehrere Ranglisten. Optional `-out seeds.yaml` für die vollständigen Ergebnisse.
 
 | Flag | Standard | Beschreibung |
 |------|----------|--------------|
 | `-from` / `-to` | 1 / 1 | Seed-Bereich |
 | `-runs` | 100 | Läufe pro Seed |
 | `-top` | 10 | Einträge pro Rangliste |
-| `-cost-p1` | 0 | Feste Reaktor-Kosten (0 = zufällig) |
-| `-cost-p2` | 0 | Feste Stromnetz-Kosten (0 = zufällig) |
+| `-energie-karte` | `eroeffnungsfeier` | Energie-Karte (Schichtplan/Bedarfe) |
+| `-finanz-karte` | `schwerindustrie` | Finanz-Karte (Schicht-Budget) |
+| `-schichten` | 1 | Anzahl aufeinanderfolgender Schichten (1-5, ganzer Monat = 5) |
+| `-schicht-keep` | 1 | Top-Boards je Erfolgs-Rangliste, die in die nächste Schicht verzweigen |
+| `-charts-dir` | `seedsearch-out` | Ausgabe für Chart-PNGs und `report.txt` |
 | `-out` | — | Vollständige Ergebnisse als YAML |
 | `-progress` | true | Fortschrittsbalken auf stderr |
 
+### Ganzen Monat simulieren
+
+Mit `-schichten n` werden `n` Schichten hintereinander gerechnet. Schicht 1 baut pro Seed ein Brett; jede Folgeschicht nimmt die Top-Boards der vorherigen Schicht (`-schicht-keep` je Rangliste aus 4 Erfolgs-Tabellen) und probiert sie mit **allen Seeds** erneut durch (Kauf + Simulation). Ungestillte Bedarfe und Schaden werden als Median über die Läufe kumulierend übernommen.
+
 ```bash
-go run ./cmd/seedsearch -from 1 -to 500 -runs 50 -cost-p1 15 -cost-p2 20 -top 5
+go run ./cmd/seedsearch -from 1 -to 500 -runs 50 -schichten 5 -schicht-keep 2 -energie-karte schturmowschtschina -finanz-karte sparmassnahmen -top 5
 ```
 
-Simulations-Flags entsprechen `cmd/sim`.
+`cmd/sim` behält dagegen die Einzel-Flags `-demand-*`, `-damage-*` und `-prev-board`.
 
 ## Projektstruktur
 

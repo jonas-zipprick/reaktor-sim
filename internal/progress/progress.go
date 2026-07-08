@@ -42,6 +42,18 @@ func NewBarTo(w io.Writer, label string, total int64, width int) *Bar {
 	}
 }
 
+// SetTotal updates the expected item count (e.g. when branching work grows).
+func (b *Bar) SetTotal(total int64) {
+	if b.closed || total < 1 {
+		return
+	}
+	b.total = total
+	if b.done > b.total {
+		b.done = b.total
+	}
+	b.render()
+}
+
 // Set updates the completed item count and redraws the bar.
 func (b *Bar) Set(done int64) {
 	if b.closed || done < 0 {

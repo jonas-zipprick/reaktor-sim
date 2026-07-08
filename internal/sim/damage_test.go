@@ -12,7 +12,6 @@ import (
 func TestVoltageWallDamageWhenNoDemand(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 8, R: 1},
@@ -37,7 +36,6 @@ func TestVoltageWallDamageWhenNoDemand(t *testing.T) {
 func TestVoltageAtTurbineDamagesWhenPlantEmpty(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 2},
@@ -66,8 +64,7 @@ func TestZoneDamageCountsTowardCriticalMass(t *testing.T) {
 	}
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{}
-	cfg.InitialHeat = 0
-	cfg.InitialChips = nil
+	cfg.InitialChips = []sim.Chip{}
 
 	res := sim.Run(s, rand.New(rand.NewSource(1)), cfg)
 	if !res.CriticalFailure {

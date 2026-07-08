@@ -19,8 +19,6 @@ func TestVoltageOnHVCascadeTriggersReactionNotDemand(t *testing.T) {
 
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = energy.Card{}
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.ShiftDemands = board.ShiftDemands{Residential: 2}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
@@ -56,8 +54,6 @@ func TestVoltageOnHVCascadeTriggersReactionNotDemand(t *testing.T) {
 func TestVoltageOnWiredBorderFieldDoesNotConsumeDemand(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = energy.Card{}
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,

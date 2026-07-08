@@ -14,7 +14,6 @@ func TestCriticalMassPerSide(t *testing.T) {
 	s := board.NewEmpty()
 	s.ApplyDemands(board.ShiftDemands{})
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	chips := make([]sim.Chip, 0, 9)
 	for i := 0; i < 9; i++ {
 		chips = append(chips, sim.Chip{
@@ -52,9 +51,8 @@ func TestBoundStoredVoltageDoesNotCountTowardCriticalMass(t *testing.T) {
 	s.Tiles[6][1].StoredVoltage = 9
 
 	cfg := sim.DefaultConfig()
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.ShiftDemands = board.ShiftDemands{}
+	cfg.InitialChips = []sim.Chip{}
 
 	res, snaps := sim.RunTrace(s, rand.New(rand.NewSource(2)), cfg)
 	if res.CriticalFailure {

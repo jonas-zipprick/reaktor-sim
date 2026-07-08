@@ -17,8 +17,6 @@ func TestGasBoilerEmitsAllSixDirections(t *testing.T) {
 		s := board.NewEmpty()
 		s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 		cfg := sim.DefaultConfig()
-		cfg.MixedEmitterTrigger = false
-		cfg.InitialHeat = 0
 		cfg.InitialChips = []sim.Chip{{Type: sim.ChipHeat, Pos: hex.Coord{Q: 0, R: 1}, Dir: hex.RotE.TravelDir()}}
 		_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(seed)), cfg)
 		for _, snap := range snaps {

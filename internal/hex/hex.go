@@ -91,14 +91,26 @@ func (c Coord) IsPlayer2() bool {
 	return c.Valid() && c.Q >= Player2MinCol
 }
 
+// wallRow reports whether the fixed player-1/player-2 wall exists in row r.
+// Row 1 holds the turbine interface, so it is open.
+func wallRow(r int) bool {
+	return r == 0 || r == 2
+}
+
 // HasWallRight is true for player-1 cells with a fixed wall to player 2 (rows 0 and 2).
 func (c Coord) HasWallRight() bool {
-	return c.Q == Player1MaxCol && (c.R == 0 || c.R == 2)
+	return c.Q == Player1MaxCol && wallRow(c.R)
 }
 
 // WallBlocksEast returns true if a chip cannot move east from this cell into player 2.
 func (c Coord) WallBlocksEast() bool {
 	return c.HasWallRight()
+}
+
+// WallBlocksWest returns true if a chip cannot move west from this cell into
+// player 1 (the fixed reactor wall, seen from the player-2 side).
+func (c Coord) WallBlocksWest() bool {
+	return c.Q == Player2MinCol && wallRow(c.R)
 }
 
 // oddRNeighborDeltas are pointy-top odd-r offsets (E, NE, NW, W, SW, SE).
@@ -127,7 +139,12 @@ func CanEnter(from, to Coord) bool {
 	if !to.Valid() {
 		return false
 	}
-	if from.WallBlocksEast() && to.Q > from.Q {
+	// The fixed reactor wall between columns 4 and 5 (rows 0 and 2) blocks the
+	// straight E/W crossing in both directions; the diagonal turbine edges stay open.
+	if from.WallBlocksEast() && to.Q > from.Q && to.R == from.R {
+		return false
+	}
+	if from.WallBlocksWest() && to.Q < from.Q && to.R == from.R {
 		return false
 	}
 	return true

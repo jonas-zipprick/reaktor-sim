@@ -60,17 +60,19 @@ func sortCoords(coords []hex.Coord) {
 	}
 }
 
-// WriteAll saves board renderings to outDir.
+// WriteAll saves board renderings to outDir using spielfeld-<fingerprint> filenames.
 func WriteAll(state *board.State, outDir string, view ChipView) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
+	fp := board.Fingerprint(state)
+	base := "spielfeld-" + fp
 	files := []struct {
 		fn   func() error
 		name string
 	}{
-		{func() error { return WriteBoardPNG(state, filepath.Join(outDir, "spielfeld.png"), view) }, "spielfeld.png"},
-		{func() error { return WriteBoardYAML(state, filepath.Join(outDir, "spielfeld.yaml")) }, "spielfeld.yaml"},
+		{func() error { return WriteBoardPNG(state, filepath.Join(outDir, base+".png"), view) }, base + ".png"},
+		{func() error { return WriteBoardYAML(state, filepath.Join(outDir, base+".yaml")) }, base + ".yaml"},
 	}
 	for _, f := range files {
 		if err := f.fn(); err != nil {

@@ -16,7 +16,6 @@ func TestTraceNarrativeCoalReaction(t *testing.T) {
 	s.Tiles[1][1] = field.NewTile(field.CoalChamber, 0, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow},
@@ -44,7 +43,6 @@ func TestTraceNarrativeStartUsesDisplayDir(t *testing.T) {
 	s := board.NewEmpty()
 	cfg := sim.DefaultConfig()
 	cfg.StartDir = hex.RotE.TravelDir()
-	cfg.MixedEmitterTrigger = false
 	cfg.Trace = true
 
 	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(2)), cfg)
@@ -56,8 +54,6 @@ func TestTraceNarrativeStartUsesDisplayDir(t *testing.T) {
 func TestZuenderTrefferNarrative(t *testing.T) {
 	s := board.NewEmpty()
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
-	cfg.MixedEmitterTrigger = false
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 1, R: 1},

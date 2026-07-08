@@ -23,7 +23,7 @@ func WriteAll(report stats.Report, outDir string) error {
 	if err := writeCostChart(report, filepath.Join(outDir, "kosten.png")); err != nil {
 		return err
 	}
-	if err := writeHistogram(report.HeatAtTurbine, "Waerme an Turbine", filepath.Join(outDir, "waerme_turbine.png")); err != nil {
+	if err := writeHistogram(report.HeatAtTurbine, "Waerme an Turbine", "Anzahl", filepath.Join(outDir, "waerme_turbine.png")); err != nil {
 		return err
 	}
 
@@ -43,7 +43,7 @@ func WriteAll(report stats.Report, outDir string) error {
 		h := report.ZoneHistograms[z]
 		title := fmt.Sprintf("Spannung bei %s", z.String())
 		path := filepath.Join(outDir, fmt.Sprintf("spannung_%s.png", names[z]))
-		if err := writeHistogram(h, title, path); err != nil {
+		if err := writeHistogram(h, title, "Anzahl", path); err != nil {
 			return err
 		}
 	}
@@ -81,10 +81,10 @@ func writeCostChart(report stats.Report, path string) error {
 	return p.Save(6*vg.Inch, 4*vg.Inch, path)
 }
 
-func writeHistogram(h stats.Histogram, title, path string) error {
+func writeHistogram(h stats.Histogram, title, xLabel, path string) error {
 	p := plot.New()
 	p.Title.Text = title
-	p.X.Label.Text = "Anzahl"
+	p.X.Label.Text = xLabel
 	p.Y.Label.Text = "Wahrscheinlichkeit"
 
 	keys := stats.SortedKeys(h)
@@ -120,5 +120,13 @@ func writeHistogram(h stats.Histogram, title, path string) error {
 		p.Y.Max = 10
 	}
 
-	return p.Save(7*vg.Inch, 4*vg.Inch, path)
+	width := 7 * vg.Inch
+	if len(keys) > 14 {
+		width = vg.Inch * vg.Length(4+float64(len(keys))*0.35)
+		if width > 20*vg.Inch {
+			width = 20 * vg.Inch
+		}
+	}
+
+	return p.Save(width, 4*vg.Inch, path)
 }

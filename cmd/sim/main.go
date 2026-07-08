@@ -13,6 +13,7 @@ import (
 	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/charts"
 	"github.com/jonas/reaktor-sim/internal/energy"
+	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/render"
 	"github.com/jonas/reaktor-sim/internal/sim"
 	"github.com/jonas/reaktor-sim/internal/stats"
@@ -22,24 +23,44 @@ func main() {
 	runs := flag.Int("runs", 20, "Anzahl Monte-Carlo-Durchlaeufe")
 	seed := flag.Int64("seed", 0, "Zufallsseed (0 = aktuelle Zeit)")
 	outDir := flag.String("out", "output", "Ausgabeverzeichnis für Charts")
-	initialHeat := flag.Int("heat", 1, "Waerme-Chips am Zuender pro Schicht (nur ohne -mixed-trigger)")
-	initialNeutron := flag.Int("neutron", 0, "Neutron-Chips am Zuender pro Schicht (nur ohne -mixed-trigger)")
-	mixedTrigger := flag.Bool("mixed-trigger", true, "1 Basis-Trigger pro Schicht: zufaellig Waerme oder Neutron")
 	traceFirst := flag.Int("trace-first", -1, "Erste n Laeufe aufzeichnen (-1 = aus, 0 = alle -runs)")
 	traceLoop := flag.Int("trace-loop", 0, "Endlosschleifen-Laeufe aufzeichnen (max. Anzahl, 0 = aus)")
 	traceWin := flag.Int("trace-win", 0, "Gewonnene Laeufe aufzeichnen (alle Bedarfe erfuellt, max. n, 0 = aus)")
-	energyCard := flag.String("energy-card", energy.DefaultCard().ID, "Energiekarte (ID, z.B. eroeffnungsfeier)")
-	shift := flag.Int("shift", 1, "Schicht 1-5 auf der Energiekarte (0 = zufaellig pro Lauf)")
+	demandI := flag.Int("demand-i", 1, "Bedarf Industrie (I)")
+	demandW := flag.Int("demand-w", 1, "Bedarf Wohnviertel (W)")
+	demandB := flag.Int("demand-b", 0, "Bedarf Bahn (b)")
+	demandR := flag.Int("demand-r", 1, "Bedarf Reaktoreigenbedarf (R)")
+	damageI := flag.Int("damage-i", 0, "Schaden Industrie (I)")
+	damageW := flag.Int("damage-w", 0, "Schaden Wohnviertel (W)")
+	damageB := flag.Int("damage-b", 0, "Schaden Bahn (b)")
+	damageR := flag.Int("damage-r", 0, "Schaden Reaktoreigenbedarf (R)")
 	costP1 := flag.Int("cost-p1", 0, "Brettkosten Spieler 1 / Reaktor in Geld (0 = zufaellig)")
 	costP2 := flag.Int("cost-p2", 0, "Brettkosten Spieler 2 / Stromnetz in Geld (0 = zufaellig)")
+	prevBoard := flag.String("prev-board", "", "Board-Fingerprint des bezahlten Bretts der Vorschicht")
+	financeID := flag.String("finanz-karte", "", "Finanz-Karte fuer Schicht-Budget (Schaden-Reparatur): "+financeCardIDs())
+	repairBudget := flag.Int("repair-budget", -1, "Max. Geld fuer Schaden-Reparatur je Lauf (1 Geld/Chip); -1 = Restbudget Stromnetz")
 	flag.Parse()
 
-	card, ok := energy.ByID(*energyCard)
-	if !ok {
-		log.Fatalf("unbekannte Energiekarte %q (verfuegbar: %s)", *energyCard, listEnergyCardIDs())
+	for name, v := range map[string]int{
+		"demand-i": *demandI, "demand-w": *demandW, "demand-b": *demandB, "demand-r": *demandR,
+		"damage-i": *damageI, "damage-w": *damageW, "damage-b": *damageB, "damage-r": *damageR,
+	} {
+		if v < 0 {
+			log.Fatalf("-%s muss >= 0 sein", name)
+		}
 	}
-	if *shift < 0 || *shift > 5 {
-		log.Fatal("-shift muss 0-5 sein")
+
+	shiftDemands := board.ShiftDemands{
+		Industry:    *demandI,
+		Residential: *demandW,
+		Rail:        *demandB,
+		Plant:       *demandR,
+	}
+	shiftDamage := board.ShiftDemands{
+		Industry:    *damageI,
+		Residential: *damageW,
+		Rail:        *damageB,
+		Plant:       *damageR,
 	}
 
 	if *traceFirst < -1 {
@@ -62,41 +83,62 @@ func main() {
 	rng := rand.New(rand.NewSource(*seed))
 
 	var state *board.State
-	if *costP1 > 0 || *costP2 > 0 {
-		var err error
-		state, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2)
+	var err error
+	switch {
+	case *prevBoard != "":
+		state, err = board.FromFingerprint(*prevBoard)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("prev-board: %v", err)
 		}
-	} else {
+		if *costP1 > 0 || *costP2 > 0 {
+			err = board.SpendShiftBudget(rng, state, *costP1, *costP2)
+		}
+	case *costP1 > 0 || *costP2 > 0:
+		state, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2)
+	default:
 		state = board.Random(rng)
 	}
-	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = *initialHeat
-	cfg.InitialNeutron = *initialNeutron
-	cfg.MixedEmitterTrigger = *mixedTrigger
-	cfg.EnergyCard = card
-	cfg.Shift = *shift
-	cfg.RandomShift = *shift == 0
-	if cfg.RandomShift {
-		cfg.ShiftDemands = card.ShiftDemands(1)
-	} else {
-		cfg.ShiftDemands = card.ShiftDemands(*shift)
+	if err != nil {
+		log.Fatal(err)
 	}
+	state.Damage = [4]int{
+		shiftDamage.Industry,
+		shiftDamage.Residential,
+		shiftDamage.Rail,
+		shiftDamage.Plant,
+	}
+
+	var financeCard finance.Card
+	if *financeID != "" {
+		var ok bool
+		financeCard, ok = finance.ByID(*financeID)
+		if !ok {
+			log.Fatalf("unbekannte Finanz-Karte %q", *financeID)
+		}
+	}
+
+	cfg := sim.DefaultConfig()
+	cfg.EnergyCard = energy.Card{}
+	cfg.Shift = 1
+	cfg.RandomShift = false
+	cfg.ShiftDemands = shiftDemands
+	cfg.RepairBudget = repairBudgetForRun(state, shiftDamage, financeCard, *repairBudget)
 	preview := state.Clone()
 	preview.ApplyDemands(cfg.ShiftDemands)
-	previewChips := sim.EmitterChips(cfg, rng)
+	previewChips := sim.EmitterChips(preview, cfg, rng)
 
 	fmt.Printf("Reaktor-Sim: %d Durchläufe (Seed %d)\n", *runs, *seed)
+	boardFP := board.Fingerprint(state)
+	fmt.Printf("Board-Fingerprint: %s\n", boardFP)
 	boardCosts := state.PlayerCosts()
 	fmt.Printf("Board-Kosten: %s (gesamt %d Geld)\n", boardCosts.String(), boardCosts.Total())
-	if cfg.RandomShift {
-		fmt.Printf("Energiekarte: %s (Stufe %d), Schicht zufaellig 1-5\n", card.Name, card.Level)
-	} else {
-		fmt.Println(card.DescribeShift(*shift))
-	}
-	if card.SpecialRule != "" {
-		fmt.Printf("Sonderregel (noch nicht simuliert): %s\n", card.SpecialRule)
+	fmt.Printf("Bedarfe: I=%d W=%d b=%d R=%d | Schaden: I=%d W=%d b=%d R=%d\n",
+		shiftDemands.Industry, shiftDemands.Residential, shiftDemands.Rail, shiftDemands.Plant,
+		shiftDamage.Industry, shiftDamage.Residential, shiftDamage.Rail, shiftDamage.Plant)
+	if cfg.RepairBudget > 0 {
+		fmt.Printf("Schaden-Reparatur: bis zu %d Geld je Lauf (zufaellige Chips)\n", cfg.RepairBudget)
+	} else if totalShiftDamage(shiftDamage) > 0 {
+		fmt.Println("Schaden-Reparatur: kein Restbudget Stromnetz (-finanz-karte fuer Reparatur-Budget)")
 	}
 	printDemands(preview)
 
@@ -120,11 +162,8 @@ func main() {
 			traceRNG := rand.New(rand.NewSource(*seed + int64(run)))
 			res, snaps := sim.RunTrace(state, traceRNG, cfg)
 			meta := render.TraceMeta{
-				EnergyCardID:    card.ID,
-				EnergyCardName:  card.Name,
-				EnergyCardLevel: card.Level,
-				Shift:           res.Shift,
-				Costs:           traceCosts,
+				Shift: res.Shift,
+				Costs: traceCosts,
 			}
 			runDir := filepath.Join(*outDir, fmt.Sprintf("run%d", run))
 			if err := render.WriteRunTrace(run, meta, snaps, *outDir); err != nil {
@@ -151,11 +190,8 @@ func main() {
 			traceRNG := rand.New(rand.NewSource(*seed + int64(mcRun)))
 			res, snaps := sim.RunTrace(state, traceRNG, cfg)
 			meta := render.TraceMeta{
-				EnergyCardID:    card.ID,
-				EnergyCardName:  card.Name,
-				EnergyCardLevel: card.Level,
-				Shift:           res.Shift,
-				Costs:           traceCosts,
+				Shift: res.Shift,
+				Costs: traceCosts,
 			}
 			seq := loopNum + 1
 			runDir := filepath.Join(*outDir, fmt.Sprintf("loop%d", seq))
@@ -185,11 +221,8 @@ func main() {
 			traceRNG := rand.New(rand.NewSource(*seed + int64(mcRun)))
 			res, snaps := sim.RunTrace(state, traceRNG, cfg)
 			meta := render.TraceMeta{
-				EnergyCardID:    card.ID,
-				EnergyCardName:  card.Name,
-				EnergyCardLevel: card.Level,
-				Shift:           res.Shift,
-				Costs:           traceCosts,
+				Shift: res.Shift,
+				Costs: traceCosts,
 			}
 			seq := winNum + 1
 			runDir := filepath.Join(*outDir, fmt.Sprintf("win%d", seq))
@@ -230,7 +263,7 @@ func main() {
 		log.Fatalf("Charts schreiben: %v", err)
 	}
 	fmt.Printf("\nAusgabe gespeichert in %s/\n", *outDir)
-	fmt.Println("  spielfeld.png / spielfeld.yaml – Brett mit Symbolen")
+	fmt.Printf("  spielfeld-%s.png / spielfeld-%s.yaml – Brett mit Symbolen\n", boardFP, boardFP)
 	if *traceFirst >= 0 {
 		fmt.Println("  runN/trace.yaml – Simulationstrace pro Lauf (siehe trace_index.yaml)")
 		fmt.Println("  runN/graph_runN_SSS.png – Graph pro Schritt")
@@ -304,10 +337,36 @@ func init() {
 	log.SetOutput(os.Stderr)
 }
 
-func listEnergyCardIDs() string {
-	ids := make([]string, len(energy.Cards))
-	for i, c := range energy.Cards {
+func financeCardIDs() string {
+	ids := make([]string, len(finance.Cards))
+	for i, c := range finance.Cards {
 		ids[i] = c.ID
 	}
 	return strings.Join(ids, ", ")
+}
+
+func totalShiftDamage(d board.ShiftDemands) int {
+	return d.Industry + d.Residential + d.Rail + d.Plant
+}
+
+func repairBudgetForRun(state *board.State, damage board.ShiftDemands, fin finance.Card, flagBudget int) int {
+	total := totalShiftDamage(damage)
+	if total == 0 {
+		return 0
+	}
+	budget := flagBudget
+	if budget < 0 {
+		if fin.ID != "" {
+			budget = fin.GridBudget - state.PlayerCosts().Player2
+		} else {
+			budget = total
+		}
+	}
+	if budget > total {
+		budget = total
+	}
+	if budget < 0 {
+		return 0
+	}
+	return budget
 }

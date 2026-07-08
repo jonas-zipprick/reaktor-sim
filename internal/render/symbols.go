@@ -46,20 +46,20 @@ func ChargeLabel(tile field.Tile) string {
 // Label returns the cell symbol including orientation where relevant.
 func Label(state *board.State, c hex.Coord) string {
 	if c.IsEmitter() {
-		return "Z"
+		return "Zu"
 	}
 	if c.IsTurbine() {
-		return "@"
+		return "Tu"
 	}
 
 	tile := state.Tiles[c.Q][c.R]
 	if tile.BurnedOut {
-		return "x"
+		return "au"
 	}
 
 	base := baseSymbol(tile.Type)
 	if base == "" {
-		return "?"
+		return "??"
 	}
 
 	switch tile.Type {
@@ -77,37 +77,37 @@ func baseSymbol(t field.Type) string {
 	case field.Empty:
 		return ""
 	case field.Mirror:
-		return "%"
+		return "Sp"
 	case field.CoalChamber:
-		return "C"
+		return "Kh"
 	case field.CoolingTower:
-		return "~"
+		return "Ku"
 	case field.GasBoiler:
-		return "G"
+		return "Eg"
 	case field.AbsorberRod:
-		return "A"
+		return "Ab"
 	case field.UraniumPlate:
-		return "U"
+		return "Ur"
 	case field.Tokamak:
-		return "O"
+		return "Tk"
 	case field.Relay:
 		return "Re"
 	case field.Transformer:
-		return "t"
+		return "Tr"
 	case field.Ground:
-		return "E"
+		return "Er"
 	case field.EmergencyGenerator:
-		return "N"
+		return "Ng"
 	case field.LeadAccumulator:
-		return "B"
+		return "Bl"
 	case field.CapacitorBank:
-		return "Ko"
+		return "Kd"
 	case field.PumpedStorage:
-		return "P"
+		return "Pu"
 	case field.HVCascade:
-		return "H"
+		return "Hv"
 	case field.Superconductor:
-		return "S"
+		return "Su"
 	default:
 		return ""
 	}
@@ -116,15 +116,14 @@ func baseSymbol(t field.Type) string {
 // Legend returns a human-readable symbol key.
 func Legend() []string {
 	return []string{
-		"Z = Zuender  @ = Turbine (Schussrichtung pro Chip zufaellig: NO/O/SO)",
-		"x=ausgebrannt  %=Spiegel  Re=Relais  S=Supraleiter  (leere Felder nur Umriss)",
-		"Rotation an Spiegel/Relais/S: NW, NE, E, SE, SW, W (im Uhrzeigersinn)",
-		"C=Kohle  ~=Kuehlturm  G=Erdgas  A=Absorber  U=Uran  O=Tokamak",
-		"t=Trafo  E=Erdung  N=Notgenerator  B=Blei  Ko=Kondensator  P=Pumpspeicher  H=HV",
+		"Zu = Zuender  Tu = Turbine (Schussrichtung pro Chip zufaellig: NO/O/SO)",
+		"au = ausgebrannt  Sp = Spiegel  Re = Relais  Su = Supraleiter  (leere Felder nur Umriss)",
+		"Rotation an Spiegel/Relais/Su: NW, NE, E, SE, SW, W (im Uhrzeigersinn)",
+		"Kh = Kohle  Ku = Kuehlturm  Eg = Erdgas  Ab = Absorber  Ur = Uran  Tk = Tokamak",
+		"Tr = Trafo  Er = Erdung  Ng = Notgenerator  Bl = Blei  Kd = Kondensator  Pu = Pumpspeicher  Hv = HV",
 		"Zahl darunter = Ladung gebunden (n/max, *=unendlich)",
 		"+nW/+nN/+nS = ungebunden (Waerme/Neutron/Spannung)  >nW/>nN/>nS = einkommend",
 		"Rand-Bedarf ausserhalb: I oben  W rechts  b unten  R oben (!n = Schaden)",
-		"| = Schnittstelle (zwischen Spalte 5 und 6)",
 	}
 }
 

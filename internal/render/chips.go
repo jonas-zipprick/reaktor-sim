@@ -100,7 +100,7 @@ func addIn(r *LooseCounts, t sim.ChipType) {
 
 // isEmptySlot reports an unoccupied playable cell (no field placed).
 func isEmptySlot(c hex.Coord, tile field.Tile) bool {
-	if c.IsEmitter() || c.IsTurbine() || c.HasWallRight() {
+	if c.IsEmitter() || c.IsTurbine() {
 		return false
 	}
 	if tile.BurnedOut {
@@ -114,7 +114,7 @@ func CellHasContent(c hex.Coord, tile field.Tile, view ChipView) bool {
 	if !c.Valid() {
 		return false
 	}
-	if c.IsEmitter() || c.IsTurbine() || c.HasWallRight() {
+	if c.IsEmitter() || c.IsTurbine() {
 		return true
 	}
 	if tile.BurnedOut || tile.Type != field.Empty {

@@ -51,6 +51,95 @@ func RandomWithPlayerCosts(rng *rand.Rand, player1, player2 int) (*State, error)
 	return s, nil
 }
 
+const removeFieldBudgetCost = 1
+
+// SpendShiftBudget spends per-player shift budgets on a board that already
+// reflects the previous shift. Removing a field costs 1; placing on an empty
+// slot or overbuilding an existing field costs the new field's catalog price.
+func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2 int) error {
+	if budgetP1 < 0 || budgetP2 < 0 {
+		return fmt.Errorf("Schicht-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
+	}
+	if err := spendHalfBudget(rng, s, true, budgetP1); err != nil {
+		return err
+	}
+	return spendHalfBudget(rng, s, false, budgetP2)
+}
+
+func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget int) error {
+	if budget == 0 {
+		return nil
+	}
+	slots := slotsForPlayer(player1)
+	market := field.GridMarket
+	if player1 {
+		market = field.ReactorMarket
+	}
+	for budget > 0 {
+		actions := validShiftActions(s, slots, market, budget)
+		if len(actions) == 0 {
+			break
+		}
+		act := actions[rng.Intn(len(actions))]
+		applyShiftAction(s, act, rng)
+		budget -= act.cost
+	}
+	return nil
+}
+
+type shiftAction struct {
+	kind  string
+	coord hex.Coord
+	tile  field.Type
+	cost  int
+}
+
+func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget int) []shiftAction {
+	var actions []shiftAction
+	if budget >= removeFieldBudgetCost {
+		for _, c := range slots {
+			t := s.tileAt(c)
+			if t != nil && t.Type != field.Empty {
+				actions = append(actions, shiftAction{
+					kind:  "remove",
+					coord: c,
+					cost:  removeFieldBudgetCost,
+				})
+			}
+		}
+	}
+	for _, c := range slots {
+		t := s.tileAt(c)
+		empty := t == nil || t.Type == field.Empty
+		for _, tileType := range market {
+			cost := fieldCost(tileType)
+			if cost > budget {
+				continue
+			}
+			kind := "overbuild"
+			if empty {
+				kind = "place"
+			}
+			actions = append(actions, shiftAction{
+				kind:  kind,
+				coord: c,
+				tile:  tileType,
+				cost:  cost,
+			})
+		}
+	}
+	return actions
+}
+
+func applyShiftAction(s *State, act shiftAction, rng *rand.Rand) {
+	switch act.kind {
+	case "remove":
+		s.Tiles[act.coord.Q][act.coord.R] = field.Tile{Type: field.Empty}
+	default:
+		placeTile(s, act.coord, act.tile, rng)
+	}
+}
+
 func slotsForPlayer(player1 bool) []hex.Coord {
 	out := make([]hex.Coord, 0, len(PlaceableSlots()))
 	for _, c := range PlaceableSlots() {

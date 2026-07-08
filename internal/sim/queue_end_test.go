@@ -15,8 +15,6 @@ func TestRunEndsWhenQueueEmptyAndNoStorage(t *testing.T) {
 	s.Tiles[2][1] = field.NewTile(field.CoolingTower, 0, 0)
 
 	cfg := sim.DefaultConfig()
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 1, R: 1},
@@ -43,8 +41,6 @@ func TestVoluntaryFireContinuesAfterQueueEmpty(t *testing.T) {
 	s.Tiles[6][1].StoredVoltage = 5
 
 	cfg := sim.DefaultConfig()
-	cfg.MixedEmitterTrigger = false
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 1, R: 1},

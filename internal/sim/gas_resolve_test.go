@@ -17,7 +17,6 @@ func TestGasBoilerEachDirectionResolves(t *testing.T) {
 			s := board.NewEmpty()
 			s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 			cfg := sim.DefaultConfig()
-			cfg.InitialHeat = 0
 			cfg.InitialChips = []sim.Chip{{Type: sim.ChipHeat, Pos: pos, Dir: dir}}
 			res := sim.Run(s, rand.New(rand.NewSource(42)), cfg)
 			if res.CriticalFailure {

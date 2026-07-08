@@ -19,7 +19,6 @@ func testCfg() sim.Config {
 
 func TestHeatReflectsOffPlayer1OuterWall(t *testing.T) {
 	cfg := testCfg()
-	cfg.InitialHeat = 1
 	cfg.StartDir = 3 // west from emitter into outer wall
 
 	rng := rand.New(rand.NewSource(1))
@@ -41,7 +40,6 @@ func TestHeatReflectsOffPlayer1OuterWall(t *testing.T) {
 
 func TestHeatReflectionNWToSE(t *testing.T) {
 	cfg := testCfg()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 1, R: 0},
@@ -61,11 +59,9 @@ func TestHeatReflectionNWToSE(t *testing.T) {
 	t.Fatal("expected heat reflection from NW")
 }
 
-
 func TestVoltageDeliveryConsumesDemand(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 8, R: 0},
@@ -81,7 +77,6 @@ func TestVoltageDeliveryConsumesDemand(t *testing.T) {
 
 func TestInternalWallStopsHeat(t *testing.T) {
 	cfg := testCfg()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 4, R: 0},
@@ -105,7 +100,6 @@ func TestInternalWallStopsHeat(t *testing.T) {
 func TestVoltageSEDoesNotConsumePlantDemand(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 8, R: 1},
@@ -128,7 +122,6 @@ func TestVoltageSEDoesNotConsumePlantDemand(t *testing.T) {
 func TestVoltageNWConsumesIndustryNotPlant(t *testing.T) {
 	cfg := testCfg()
 	cfg.ShiftDemands = board.ShiftDemands{Plant: 1, Industry: 1}
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 6, R: 0},

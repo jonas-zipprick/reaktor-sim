@@ -3,41 +3,71 @@ package seedsearch
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"strings"
 
 	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/energy"
+	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
 
-// Options mirror the main simulator settings used per seed.
+// Options configure a full-month (multi-shift) Monte-Carlo scan.
 type Options struct {
-	Runs              int
-	InitialHeat       int
-	InitialNeutron    int
-	MixedEmitterTrigger bool
-	EnergyCardID      string
-	Shift             int
-	CostP1            int
-	CostP2            int
+	Runs       int
+	EnergyCard energy.Card  // provides the per-shift demand plan (Schichtplan)
+	Finance    finance.Card // provides the per-shift budget
+	Shifts     int          // number of consecutive shifts to simulate (1-5)
+	ShiftKeep  int          // boards kept per ranking table to branch into the next shift
+}
+
+// shiftCount clamps the configured shift count to the valid 1-5 range.
+func (o Options) shiftCount() int {
+	if o.Shifts < 1 {
+		return 1
+	}
+	if o.Shifts > 5 {
+		return 5
+	}
+	return o.Shifts
+}
+
+// shiftKeep clamps the number of boards kept per ranking table to at least 1.
+func (o Options) shiftKeep() int {
+	if o.ShiftKeep < 1 {
+		return 1
+	}
+	return o.ShiftKeep
 }
 
 // ZoneTotals holds per-zone averages across Monte-Carlo runs (index = board.Zone).
 type ZoneTotals [4]float64
 
-// Outcome aggregates one seed's Monte-Carlo batch.
+// Outcome aggregates one seed's Monte-Carlo batch for a single shift.
 type Outcome struct {
-	Seed         int64
-	BoardCosts   board.PlayerCosts
-	Wins         int
-	Loops        int
-	CriticalP1   int
-	CriticalP2   int
-	AvgEndDemand ZoneTotals
-	AvgEndDamage ZoneTotals
-	Runs         int
+	Seed                 int64
+	Shift                int
+	BoardFingerprint     string
+	PrevBoardFingerprint string             // board carried in from the previous shift ("" for shift 1)
+	StartDemands         board.ShiftDemands // card + carry at shift start
+	StartDamage          [4]int             // damage carry at shift start
+	RepairBudget         int                // max repair spend per MC run
+	BoardCosts           board.PlayerCosts
+	Wins                 int
+	AllDemandsNoDamage   int // all demands met, zero damage
+	Max1DemandNoDamage   int // at most one unmet demand, zero damage
+	Max1DemandMax1Damage int // at most one unmet demand, at most one damage
+	Loops                int
+	CriticalP1           int
+	CriticalP2           int
+	AvgEndDemand         ZoneTotals
+	AvgEndDamage         ZoneTotals
+	MedianEndDemand      [4]int // per-zone median remaining demand (carried to next shift)
+	MedianEndDamage      [4]int // per-zone median remaining damage (carried to next shift)
+	AvgSteps             float64
+	Runs                 int
 }
 
 // WinRate returns the fraction of runs with all demands fulfilled.
@@ -67,6 +97,11 @@ func (o Outcome) EndDamageSummary() string {
 		return "-"
 	}
 	return formatZoneTotals(o.AvgEndDamage)
+}
+
+// AvgStepsSummary formats the average number of simulation steps per run.
+func (o Outcome) AvgStepsSummary() string {
+	return formatAvg(o.AvgSteps)
 }
 
 func (z ZoneTotals) allZero() bool {
@@ -103,22 +138,102 @@ func formatAvg(v float64) string {
 	return fmt.Sprintf("%.1f", v)
 }
 
-// Evaluate runs the full Monte-Carlo batch for one board seed.
-func Evaluate(seed int64, opts Options) (Outcome, error) {
-	state, cfg, err := prepare(seed, opts)
+// EvaluateChain simulates all configured shifts for one seed and returns one
+// Outcome per shift. The board, remaining demand and damage carry forward.
+func EvaluateChain(seed int64, opts Options) ([]Outcome, error) {
+	rng := rand.New(rand.NewSource(seed))
+	state, err := buildInitialBoard(rng, opts)
 	if err != nil {
-		return Outcome{}, err
+		return nil, err
 	}
-	results := sim.RunMonteCarlo(state, opts.Runs, seed, cfg)
+	return evaluateChain(seed, rng, state, opts), nil
+}
+
+// buildInitialBoard creates the shift-1 board using the finance budget.
+func buildInitialBoard(rng *rand.Rand, opts Options) (*board.State, error) {
+	p1 := opts.Finance.ReactorBudget
+	p2 := opts.Finance.GridBudget
+	if p1 <= 0 && p2 <= 0 {
+		return board.Random(rng), nil
+	}
+	return board.RandomWithPlayerCosts(rng, p1, p2)
+}
+
+// evaluateChain runs shifts 1..N on the (already built) initial board for a
+// single seed, mutating it via SpendShiftBudget for each subsequent shift. Used
+// for a linear single-seed chain (Scan uses branching instead).
+func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options) []Outcome {
+	shifts := opts.shiftCount()
+	outcomes := make([]Outcome, 0, shifts)
+	var carryDemand, carryDamage [4]int
+	var prevFP string
+	for k := 1; k <= shifts; k++ {
+		if k > 1 {
+			// Spend this shift's budget on the carried board.
+			_ = board.SpendShiftBudget(rng, state, opts.Finance.ReactorBudget, opts.Finance.GridBudget)
+		}
+		out := evaluateShift(seed, state, opts, k, prevFP, carryDemand, carryDamage)
+		outcomes = append(outcomes, out)
+		prevFP = out.BoardFingerprint
+		carryDemand = out.MedianEndDemand
+		carryDamage = out.MedianEndDamage
+	}
+	return outcomes
+}
+
+// evaluateShift simulates one shift on state (already reflecting this shift's
+// purchases) with the given carried demand/damage, returning the outcome.
+func evaluateShift(seed int64, state *board.State, opts Options, shift int, prevFP string, carryDemand, carryDamage [4]int) Outcome {
+	cardDemand := opts.EnergyCard.ShiftDemands(shift)
+	combined := board.ShiftDemands{
+		Industry:    cardDemand.Industry + carryDemand[board.ZoneIndustry],
+		Residential: cardDemand.Residential + carryDemand[board.ZoneResidential],
+		Rail:        cardDemand.Rail + carryDemand[board.ZoneRail],
+		Plant:       cardDemand.Plant + carryDemand[board.ZonePlant],
+	}
+	state.Damage = carryDamage
+
+	cfg := sim.DefaultConfig()
+	cfg.EnergyCard = energy.Card{}
+	cfg.Shift = shift
+	cfg.RandomShift = false
+	cfg.ShiftDemands = combined
+	cfg.RepairBudget = gridRepairBudget(state, opts.Finance)
+
+	out := evaluatePrepared(seed, state, opts.Runs, cfg)
+	out.Shift = shift
+	out.PrevBoardFingerprint = prevFP
+	out.StartDemands = combined
+	out.StartDamage = carryDamage
+	return out
+}
+
+func evaluatePrepared(seed int64, state *board.State, runs int, cfg sim.Config) Outcome {
+	results := sim.RunMonteCarlo(state, runs, seed, cfg)
 	out := Outcome{
-		Seed:       seed,
-		BoardCosts: state.PlayerCosts(),
-		Runs:       opts.Runs,
+		Seed:             seed,
+		BoardFingerprint: board.Fingerprint(state),
+		BoardCosts:       state.PlayerCosts(),
+		Runs:             runs,
+		RepairBudget:     cfg.RepairBudget,
 	}
 	var sumDemand, sumDamage ZoneTotals
+	var sumSteps float64
+	var endDemand, endDamage [4][]int
 	for _, res := range results {
 		if res.AllDemandsMet {
 			out.Wins++
+		}
+		remainingDemand := totalRemainingDemand(res)
+		remainingDamage := totalRemainingDamage(res)
+		if remainingDemand == 0 && remainingDamage == 0 {
+			out.AllDemandsNoDamage++
+		}
+		if remainingDemand <= 1 && remainingDamage == 0 {
+			out.Max1DemandNoDamage++
+		}
+		if remainingDemand <= 1 && remainingDamage <= 1 {
+			out.Max1DemandMax1Damage++
 		}
 		if res.StepLimitExceeded {
 			out.Loops++
@@ -132,38 +247,157 @@ func Evaluate(seed int64, opts Options) (Outcome, error) {
 		for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
 			sumDemand[z] += float64(res.EndDemands[z])
 			sumDamage[z] += float64(res.EndDamage[z])
+			endDemand[z] = append(endDemand[z], res.EndDemands[z])
+			endDamage[z] = append(endDamage[z], res.EndDamage[z])
 		}
+		sumSteps += float64(res.Steps)
 	}
-	if opts.Runs > 0 {
+	if runs > 0 {
 		for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
-			out.AvgEndDemand[z] = sumDemand[z] / float64(opts.Runs)
-			out.AvgEndDamage[z] = sumDamage[z] / float64(opts.Runs)
+			out.AvgEndDemand[z] = sumDemand[z] / float64(runs)
+			out.AvgEndDamage[z] = sumDamage[z] / float64(runs)
+			out.MedianEndDemand[z] = medianInt(endDemand[z])
+			out.MedianEndDamage[z] = medianInt(endDamage[z])
 		}
+		out.AvgSteps = sumSteps / float64(runs)
 	}
-	return out, nil
+	return out
+}
+
+// medianInt returns the median of vals, rounding a two-element midpoint up.
+func medianInt(vals []int) int {
+	if len(vals) == 0 {
+		return 0
+	}
+	s := append([]int(nil), vals...)
+	sort.Ints(s)
+	n := len(s)
+	if n%2 == 1 {
+		return s[n/2]
+	}
+	return int(math.Round(float64(s[n/2-1]+s[n/2]) / 2))
 }
 
 // ProgressFunc is called after each seed is evaluated.
 type ProgressFunc func(done, total int64)
 
-// Scan evaluates every seed in [from, to] inclusive.
-func Scan(from, to int64, opts Options, progress ProgressFunc) ([]Outcome, error) {
+// ShiftResult holds all seed outcomes for one shift.
+type ShiftResult struct {
+	Shift    int
+	Outcomes []Outcome
+}
+
+// ScanResult holds per-shift outcomes from a seed range scan.
+type ScanResult struct {
+	Shifts            []ShiftResult
+	SkippedDuplicates int64
+}
+
+// parentBoard is a board kept from one shift to branch into the next: its
+// as-built fingerprint plus the demand/damage carried forward.
+type parentBoard struct {
+	fp     string
+	demand [4]int
+	damage [4]int
+}
+
+// KeepTableCount is the number of ranking tables from which boards are kept to
+// branch into the next shift (the success tables; loops are excluded).
+const KeepTableCount = 4
+
+var keepTables = []func([]Outcome, int) []Outcome{
+	TopWins,
+	TopAllDemandsNoDamage,
+	TopMax1DemandNoDamage,
+	TopMax1DemandMax1Damage,
+}
+
+// EstimateScanWork returns an upper bound on Scan evaluations for progress bars.
+func EstimateScanWork(from, to int64, opts Options) int64 {
+	seedCount := to - from + 1
+	if seedCount < 1 {
+		return 1
+	}
+	shifts := opts.shiftCount()
+	if shifts <= 1 {
+		return seedCount
+	}
+	maxParents := int64(opts.shiftKeep()) * int64(KeepTableCount)
+	return seedCount + (int64(shifts)-1)*maxParents*seedCount
+}
+
+// Scan simulates the month shift by shift. Shift 1 builds a board for every seed
+// (duplicates removed). For each following shift, the top boards of the previous
+// shift (opts.ShiftKeep per ranking table) are re-developed with every seed's
+// purchase, keeping the branching bounded.
+func Scan(from, to int64, opts Options, progress ProgressFunc) (ScanResult, error) {
 	if from > to {
-		return nil, fmt.Errorf("from (%d) > to (%d)", from, to)
+		return ScanResult{}, fmt.Errorf("from (%d) > to (%d)", from, to)
 	}
-	total := to - from + 1
-	out := make([]Outcome, 0, total)
-	for seed := from; seed <= to; seed++ {
-		o, err := Evaluate(seed, opts)
+	shifts := opts.shiftCount()
+	seedCount := to - from + 1
+	var result ScanResult
+	tracker := &scanTracker{progress: progress}
+	tracker.setTotal(seedCount)
+
+	shift1, err := scanShift1(from, to, opts, tracker)
+	if err != nil {
+		return ScanResult{}, err
+	}
+	result.Shifts = append(result.Shifts, ShiftResult{Shift: 1, Outcomes: shift1})
+	parents := selectParents(shift1, opts.shiftKeep())
+
+	for k := 2; k <= shifts; k++ {
+		tracker.addTotal(int64(len(parents)) * seedCount)
+		outcomes, err := scanShiftBranch(k, from, to, parents, opts, tracker)
 		if err != nil {
-			return nil, fmt.Errorf("seed %d: %w", seed, err)
+			return ScanResult{}, err
 		}
-		out = append(out, o)
-		if progress != nil {
-			progress(seed-from+1, total)
+		result.Shifts = append(result.Shifts, ShiftResult{Shift: k, Outcomes: outcomes})
+		parents = selectParents(outcomes, opts.shiftKeep())
+	}
+	result.SkippedDuplicates = tracker.skipped.Load()
+	return result, nil
+}
+
+// selectParents gathers the top keep boards from each success ranking table,
+// de-duplicated by board fingerprint and carried demand/damage.
+func selectParents(outcomes []Outcome, keep int) []parentBoard {
+	if keep < 1 {
+		keep = 1
+	}
+	seen := make(map[string]struct{})
+	var parents []parentBoard
+	for _, pick := range keepTables {
+		for _, o := range pick(outcomes, keep) {
+			key := o.BoardFingerprint + carryKey(o.MedianEndDemand, o.MedianEndDamage)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			parents = append(parents, parentBoard{
+				fp:     o.BoardFingerprint,
+				demand: o.MedianEndDemand,
+				damage: o.MedianEndDamage,
+			})
 		}
 	}
-	return out, nil
+	return parents
+}
+
+func carryKey(demand, damage [4]int) string {
+	return fmt.Sprintf("|d%v|s%v", demand, damage)
+}
+
+// WinningOnly returns outcomes with at least one run where all demands were met.
+func WinningOnly(outcomes []Outcome) []Outcome {
+	out := make([]Outcome, 0, len(outcomes))
+	for _, o := range outcomes {
+		if o.Wins > 0 {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 // TopWins returns up to n outcomes with the highest win counts.
@@ -176,14 +410,70 @@ func TopWins(outcomes []Outcome, n int) []Outcome {
 	})
 }
 
-// TopLoops returns up to n outcomes with the highest loop counts.
+// TopLoops returns up to n outcomes with the highest loop counts. Outcomes
+// without any loops are excluded, so the result is empty when no loops occurred.
 func TopLoops(outcomes []Outcome, n int) []Outcome {
-	return topN(outcomes, n, func(a, b Outcome) bool {
+	withLoops := make([]Outcome, 0, len(outcomes))
+	for _, o := range outcomes {
+		if o.Loops > 0 {
+			withLoops = append(withLoops, o)
+		}
+	}
+	return topN(withLoops, n, func(a, b Outcome) bool {
 		if a.Loops != b.Loops {
 			return a.Loops > b.Loops
 		}
 		return a.Seed < b.Seed
 	})
+}
+
+// TopAllDemandsNoDamage returns up to n outcomes with the most runs where all
+// demands were met and no damage remained.
+func TopAllDemandsNoDamage(outcomes []Outcome, n int) []Outcome {
+	return topN(outcomes, n, func(a, b Outcome) bool {
+		if a.AllDemandsNoDamage != b.AllDemandsNoDamage {
+			return a.AllDemandsNoDamage > b.AllDemandsNoDamage
+		}
+		return a.Seed < b.Seed
+	})
+}
+
+// TopMax1DemandNoDamage returns up to n outcomes with the most runs where at
+// most one demand was unmet and no damage remained.
+func TopMax1DemandNoDamage(outcomes []Outcome, n int) []Outcome {
+	return topN(outcomes, n, func(a, b Outcome) bool {
+		if a.Max1DemandNoDamage != b.Max1DemandNoDamage {
+			return a.Max1DemandNoDamage > b.Max1DemandNoDamage
+		}
+		return a.Seed < b.Seed
+	})
+}
+
+// TopMax1DemandMax1Damage returns up to n outcomes with the most runs where at
+// most one demand was unmet and at most one damage chip remained.
+func TopMax1DemandMax1Damage(outcomes []Outcome, n int) []Outcome {
+	return topN(outcomes, n, func(a, b Outcome) bool {
+		if a.Max1DemandMax1Damage != b.Max1DemandMax1Damage {
+			return a.Max1DemandMax1Damage > b.Max1DemandMax1Damage
+		}
+		return a.Seed < b.Seed
+	})
+}
+
+func totalRemainingDemand(res sim.Result) int {
+	total := 0
+	for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
+		total += res.EndDemands[z]
+	}
+	return total
+}
+
+func totalRemainingDamage(res sim.Result) int {
+	total := 0
+	for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
+		total += res.EndDamage[z]
+	}
+	return total
 }
 
 func topN(outcomes []Outcome, n int, less func(a, b Outcome) bool) []Outcome {
@@ -198,38 +488,14 @@ func topN(outcomes []Outcome, n int, less func(a, b Outcome) bool) []Outcome {
 	return cp[:n]
 }
 
-func prepare(seed int64, opts Options) (*board.State, sim.Config, error) {
-	card, ok := energy.ByID(opts.EnergyCardID)
-	if !ok {
-		return nil, sim.Config{}, fmt.Errorf("unbekannte Energiekarte %q", opts.EnergyCardID)
+func gridRepairBudget(state *board.State, fin finance.Card) int {
+	left := fin.GridBudget - state.PlayerCosts().Player2
+	if left <= 0 {
+		return 0
 	}
-	if opts.Shift < 0 || opts.Shift > 5 {
-		return nil, sim.Config{}, fmt.Errorf("shift muss 0-5 sein, got %d", opts.Shift)
+	total := state.TotalPlayer2Damage()
+	if left > total {
+		return total
 	}
-
-	rng := rand.New(rand.NewSource(seed))
-	var state *board.State
-	var err error
-	if opts.CostP1 > 0 || opts.CostP2 > 0 {
-		state, err = board.RandomWithPlayerCosts(rng, opts.CostP1, opts.CostP2)
-	} else {
-		state = board.Random(rng)
-	}
-	if err != nil {
-		return nil, sim.Config{}, err
-	}
-
-	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = opts.InitialHeat
-	cfg.InitialNeutron = opts.InitialNeutron
-	cfg.MixedEmitterTrigger = opts.MixedEmitterTrigger
-	cfg.EnergyCard = card
-	cfg.Shift = opts.Shift
-	cfg.RandomShift = opts.Shift == 0
-	if cfg.RandomShift {
-		cfg.ShiftDemands = card.ShiftDemands(1)
-	} else {
-		cfg.ShiftDemands = card.ShiftDemands(opts.Shift)
-	}
-	return state, cfg, nil
+	return left
 }

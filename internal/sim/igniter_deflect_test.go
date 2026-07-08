@@ -13,7 +13,6 @@ func TestIgniterDestroysChip(t *testing.T) {
 	emitter := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
 	s := board.NewEmpty()
 	cfg := sim.DefaultConfig()
-	cfg.InitialHeat = 0
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 1, R: 1},
@@ -43,7 +42,6 @@ func TestTurbineVoltageOnlyValidShootDirs(t *testing.T) {
 	for seed := int64(0); seed < 100; seed++ {
 		s := board.NewEmpty()
 		cfg := sim.DefaultConfig()
-		cfg.InitialHeat = 0
 		cfg.InitialChips = []sim.Chip{{
 			Type: sim.ChipHeat,
 			Pos:  tCoord,

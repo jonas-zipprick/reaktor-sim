@@ -16,15 +16,14 @@ import (
 )
 
 var (
-	colReactor  = color.RGBA{R: 255, G: 235, B: 210, A: 255}
-	colGrid     = color.RGBA{R: 210, G: 230, B: 255, A: 255}
-	colNeutral  = color.RGBA{R: 235, G: 235, B: 235, A: 255}
-	colBorder   = color.RGBA{R: 60, G: 60, B: 60, A: 255}
-	colSpecial  = color.RGBA{R: 255, G: 220, B: 120, A: 255}
-	colBurned   = color.RGBA{R: 180, G: 180, B: 180, A: 255}
-	colDemand   = color.RGBA{R: 200, G: 255, B: 200, A: 255}
-	colText     = color.RGBA{R: 20, G: 20, B: 20, A: 255}
-	colIface    = color.RGBA{R: 255, G: 200, B: 200, A: 255}
+	colReactor      = color.RGBA{R: 255, G: 235, B: 210, A: 255}
+	colGrid         = color.RGBA{R: 210, G: 230, B: 255, A: 255}
+	colNeutral      = color.RGBA{R: 235, G: 235, B: 235, A: 255}
+	colBorder       = color.RGBA{R: 60, G: 60, B: 60, A: 255}
+	colSpecial      = color.RGBA{R: 255, G: 220, B: 120, A: 255}
+	colBurned       = color.RGBA{R: 180, G: 180, B: 180, A: 255}
+	colDemand       = color.RGBA{R: 200, G: 255, B: 200, A: 255}
+	colText         = color.RGBA{R: 20, G: 20, B: 20, A: 255}
 	colEmptyOutline = color.RGBA{R: 220, G: 220, B: 225, A: 255}
 )
 
@@ -54,7 +53,7 @@ func WriteBoardPNG(state *board.State, path string, view ChipView) error {
 
 	drawDemandOutside(img, state, ly, 0)
 
-	drawLabelLeft(img, image.Pt(10, ly.gridHeight+10), "Reaktor (Spalten 1-5) | Turbine @ | Stromnetz (Spalten 6-9)", colText)
+	drawLabelLeft(img, image.Pt(10, ly.gridHeight+10), "Reaktor (Spalten 1-5) | Turbine Tu | Stromnetz (Spalten 6-9)", colText)
 	for i, line := range Legend() {
 		drawLabelLeft(img, image.Pt(10, ly.gridHeight+28+i*legendLineHeight), line, colText)
 	}
@@ -82,9 +81,6 @@ func cellFillFor(state *board.State, c hex.Coord, tile field.Tile) color.RGBA {
 func cellFill(c hex.Coord, tile field.Tile) color.RGBA {
 	if c.IsEmitter() || c.IsTurbine() {
 		return colSpecial
-	}
-	if c.HasWallRight() {
-		return colIface
 	}
 	if tile.BurnedOut {
 		return colBurned
