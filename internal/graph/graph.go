@@ -105,6 +105,12 @@ func normalizeNodeEdges(g *Graph) {
 
 func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOut {
 	if tile.BurnedOut {
+		switch tile.Type {
+		case field.CoalChamber:
+			return emitterOut(c, 1, 1, 0, true)
+		case field.Transformer:
+			return burnedRedirectOut(c)
+		}
 		return nil
 	}
 
@@ -194,6 +200,30 @@ func emitterOut(c hex.Coord, count int, heatW, neutronW float64, active bool) []
 	return outs
 }
 
+func burnedRedirectOut(c hex.Coord) []rawOut {
+	outs := make([]rawOut, 0, 18)
+	p := 1.0 / 6.0
+	for dir := 0; dir < 6; dir++ {
+		for _, pt := range []ParticleType{Heat, Neutron, Voltage} {
+			to, ok := flowTarget(c, dir, pt)
+			if !ok {
+				continue
+			}
+			ro := rawOut{to: to}
+			switch pt {
+			case Heat:
+				ro.heat = p
+			case Neutron:
+				ro.neutron = p
+			case Voltage:
+				ro.voltage = p
+			}
+			outs = append(outs, ro)
+		}
+	}
+	return outs
+}
+
 func absorb() []rawOut { return nil }
 
 func absorbNeutron() []rawOut { return nil }
@@ -207,6 +237,13 @@ func forwardOrReflect(c hex.Coord, incomingDir int, heat, neutron, voltage float
 	}
 	switch hex.BlockedBoundary(c, next, incomingDir) {
 	case hex.BoundaryInternalWall:
+		if heat > 0 {
+			refDir := hex.ReflectOffOuterWall(incomingDir)
+			refNext := c.Neighbor(refDir)
+			if hex.CanEnter(c, refNext) {
+				return []rawOut{{to: refNext, heat: heat, neutron: neutron, voltage: voltage}}
+			}
+		}
 		return nil
 	case hex.BoundaryOuter:
 		h, n, v := 0.0, 0.0, 0.0

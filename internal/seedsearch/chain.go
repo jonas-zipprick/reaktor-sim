@@ -39,6 +39,9 @@ func findParent(candidates []Outcome, child Outcome, childShift int, card energy
 		if o.MedianEndDemand != wantDemand {
 			continue
 		}
+		if o.EndLeftover != child.StartLeftover {
+			continue
+		}
 		return o, nil
 	}
 	return Outcome{}, fmt.Errorf("kein Parent fuer Schicht %d (board %s)", childShift, child.PrevBoardFingerprint)

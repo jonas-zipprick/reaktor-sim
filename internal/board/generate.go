@@ -32,8 +32,9 @@ func RandomWithCost(rng *rand.Rand, target int) (*State, error) {
 }
 
 // RandomWithPlayerCosts builds a board with exact costs per player half.
-// A target of 0 leaves that half empty (no fields placed).
-func RandomWithPlayerCosts(rng *rand.Rand, player1, player2 int) (*State, error) {
+// Deprecated: use RandomWithPlayerCosts in budget.go which spends up to budget.
+// Kept as exact-fill helper for tests.
+func randomWithPlayerCostsExact(rng *rand.Rand, player1, player2, monthFilter int) (*State, error) {
 	if player1 < 0 || player2 < 0 {
 		return nil, fmt.Errorf("Brettkosten duerfen nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", player1, player2)
 	}
@@ -42,50 +43,16 @@ func RandomWithPlayerCosts(rng *rand.Rand, player1, player2 int) (*State, error)
 	}
 
 	s := NewEmpty()
-	if err := fillSlotCosts(rng, s, slotsForPlayer(true), player1, "Spieler 1 (Reaktor)"); err != nil {
+	if err := fillSlotCosts(rng, s, slotsForPlayer(true), player1, "Spieler 1 (Reaktor)", monthFilter); err != nil {
 		return nil, err
 	}
-	if err := fillSlotCosts(rng, s, slotsForPlayer(false), player2, "Spieler 2 (Stromnetz)"); err != nil {
+	if err := fillSlotCosts(rng, s, slotsForPlayer(false), player2, "Spieler 2 (Stromnetz)", monthFilter); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
 const removeFieldBudgetCost = 1
-
-// SpendShiftBudget spends per-player shift budgets on a board that already
-// reflects the previous shift. Removing a field costs 1; placing on an empty
-// slot or overbuilding an existing field costs the new field's catalog price.
-func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2 int) error {
-	if budgetP1 < 0 || budgetP2 < 0 {
-		return fmt.Errorf("Schicht-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
-	}
-	if err := spendHalfBudget(rng, s, true, budgetP1); err != nil {
-		return err
-	}
-	return spendHalfBudget(rng, s, false, budgetP2)
-}
-
-func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget int) error {
-	if budget == 0 {
-		return nil
-	}
-	slots := slotsForPlayer(player1)
-	market := field.GridMarket
-	if player1 {
-		market = field.ReactorMarket
-	}
-	for budget > 0 {
-		actions := validShiftActions(s, slots, market, budget)
-		if len(actions) == 0 {
-			break
-		}
-		act := actions[rng.Intn(len(actions))]
-		applyShiftAction(s, act, rng)
-		budget -= act.cost
-	}
-	return nil
-}
 
 type shiftAction struct {
 	kind  string
@@ -109,15 +76,16 @@ func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget 
 		}
 	}
 	for _, c := range slots {
-		t := s.tileAt(c)
-		empty := t == nil || t.Type == field.Empty
+		vacant := slotIsVacant(c, s)
 		for _, tileType := range market {
 			cost := fieldCost(tileType)
 			if cost > budget {
 				continue
 			}
+			// Any slot can be built on: vacant slots are "place", occupied ones are
+			// "overbuild" (full new-field cost, fresh charge/orientation).
 			kind := "overbuild"
-			if empty {
+			if vacant {
 				kind = "place"
 			}
 			actions = append(actions, shiftAction{
@@ -129,6 +97,14 @@ func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget 
 		}
 	}
 	return actions
+}
+
+func slotIsVacant(c hex.Coord, s *State) bool {
+	t := s.tileAt(c)
+	if t == nil {
+		return true
+	}
+	return t.Type == field.Empty || t.BurnedOut
 }
 
 func applyShiftAction(s *State, act shiftAction, rng *rand.Rand) {
@@ -150,11 +126,11 @@ func slotsForPlayer(player1 bool) []hex.Coord {
 	return out
 }
 
-func fillSlotCosts(rng *rand.Rand, s *State, slots []hex.Coord, target int, label string) error {
+func fillSlotCosts(rng *rand.Rand, s *State, slots []hex.Coord, target int, label string, monthFilter int) error {
 	if target == 0 {
 		return nil
 	}
-	planner, err := newCostPlanner(slots)
+	planner, err := newCostPlanner(slots, monthFilter)
 	if err != nil {
 		return err
 	}
@@ -187,7 +163,7 @@ func randomWithCostOnSlots(rng *rand.Rand, target int) (*State, error) {
 		return NewEmpty(), nil
 	}
 	s := NewEmpty()
-	if err := fillSlotCosts(rng, s, PlaceableSlots(), target, "gesamt"); err != nil {
+	if err := fillSlotCosts(rng, s, PlaceableSlots(), target, "gesamt", 0); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -202,7 +178,7 @@ type costPlanner struct {
 	maxCost    int
 }
 
-func newCostPlanner(slots []hex.Coord) (*costPlanner, error) {
+func newCostPlanner(slots []hex.Coord, monthFilter int) (*costPlanner, error) {
 	n := len(slots)
 	p := &costPlanner{
 		slots:      slots,
@@ -211,9 +187,9 @@ func newCostPlanner(slots []hex.Coord) (*costPlanner, error) {
 		minCost:    0,
 	}
 	for i, c := range slots {
-		types := make([]field.Type, 0, len(marketFor(c))+1)
+		types := make([]field.Type, 0, len(marketFor(c, monthFilter))+1)
 		types = append(types, field.Empty)
-		types = append(types, marketFor(c)...)
+		types = append(types, marketFor(c, monthFilter)...)
 		p.slotTypes[i] = types
 		slotMax := 0
 		for _, t := range types {
@@ -272,11 +248,15 @@ func (p *costPlanner) validChoices(slotIdx, remaining int) []field.Type {
 	return out
 }
 
-func marketFor(c hex.Coord) []field.Type {
-	if c.IsPlayer2() {
-		return field.GridMarket
+func marketFor(c hex.Coord, monthFilter int) []field.Type {
+	return field.FilterMarket(marketForPlayer(c.IsPlayer1()), monthFilter)
+}
+
+func marketForPlayer(player1 bool) []field.Type {
+	if player1 {
+		return field.ReactorMarket
 	}
-	return field.ReactorMarket
+	return field.GridMarket
 }
 
 func fieldCost(t field.Type) int {

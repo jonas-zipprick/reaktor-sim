@@ -16,7 +16,10 @@ func TestRepairBudgetReducesStartDamage(t *testing.T) {
 	cfg.RepairBudget = 1
 	cfg.ShiftDemands = board.DefaultShiftDemands()
 
-	_, snaps := sim.RunTrace(state, rand.New(rand.NewSource(1)), cfg)
+	res, snaps := sim.RunTrace(state, rand.New(rand.NewSource(1)), cfg)
+	if res.RepairSpent != 1 {
+		t.Fatalf("repair spent = %d, want 1", res.RepairSpent)
+	}
 	if len(snaps) == 0 {
 		t.Fatal("no snapshots")
 	}

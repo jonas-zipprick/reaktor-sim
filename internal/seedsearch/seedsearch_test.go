@@ -41,7 +41,7 @@ func TestEvaluateChainDeterministic(t *testing.T) {
 }
 
 func TestEvaluateChainInitialBoardCosts(t *testing.T) {
-	fin, ok := finance.ByID("schwerindustrie") // Reaktor 3 | Stromnetz 3
+	fin, ok := finance.ByID("schwerindustrie") // Reaktor 3 | Stromnetz 4
 	if !ok {
 		t.Fatal("finance card missing")
 	}
@@ -52,8 +52,10 @@ func TestEvaluateChainInitialBoardCosts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if chain[0].BoardCosts.Player1 != 3 || chain[0].BoardCosts.Player2 != 3 {
-		t.Fatalf("shift-1 board costs = %+v, want P1=3 P2=3", chain[0].BoardCosts)
+	spent := chain[0].BoardCosts
+	left := chain[0].EndLeftover
+	if spent.Player1+left.Player1 != 3 || spent.Player2+left.Player2 != 4 {
+		t.Fatalf("shift-1 spend %+v + rest %+v != budget 3/4", spent, left)
 	}
 }
 
@@ -126,6 +128,33 @@ func TestScanFiltersDuplicateBoards(t *testing.T) {
 			t.Fatalf("duplicate fingerprint survived filtering: %s", o.BoardFingerprint)
 		}
 		seen[o.BoardFingerprint] = true
+	}
+}
+
+func TestEstimateScanWork(t *testing.T) {
+	opts := seedsearch.Options{Shifts: 1}
+	if got := seedsearch.EstimateScanWork(1, 100, opts); got != 100 {
+		t.Fatalf("single shift = %d, want 100", got)
+	}
+	opts.Shifts = 5
+	opts.ShiftKeep = 1
+	// 100 seeds + 4 branch shifts × 4 max parents × 100 seeds
+	want := int64(100 + 4*4*100)
+	if got := seedsearch.EstimateScanWork(1, 100, opts); got != want {
+		t.Fatalf("5 shifts = %d, want %d", got, want)
+	}
+}
+
+func TestTotalMedianEndTotals(t *testing.T) {
+	o := seedsearch.Outcome{
+		MedianEndDemand: [4]int{1, 2, 0, 1},
+		MedianEndDamage: [4]int{0, 1, 1, 0},
+	}
+	if got := o.TotalMedianEndDemand(); got != 4 {
+		t.Fatalf("TotalMedianEndDemand = %d, want 4", got)
+	}
+	if got := o.TotalMedianEndDamage(); got != 2 {
+		t.Fatalf("TotalMedianEndDamage = %d, want 2", got)
 	}
 }
 

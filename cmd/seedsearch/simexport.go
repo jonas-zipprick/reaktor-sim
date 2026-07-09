@@ -28,27 +28,30 @@ var topTables = []topTable{
 	{"top_loops", seedsearch.TopLoops},
 }
 
-func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, runs int) error {
+func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, runs, keep int) error {
 	if len(scan.Shifts) == 0 {
 		return nil
 	}
 	last := scan.Shifts[len(scan.Shifts)-1]
 	base := filepath.Join(dir, fmt.Sprintf("top_sims_schicht_%d", last.Shift))
 
+	seen := make(map[string]struct{})
 	for _, tbl := range topTables {
-		rows := tbl.pick(last.Outcomes, 1)
+		rows := seedsearch.PickUniqueOutcomes(last.Outcomes, tbl.pick, keep, seen)
 		if len(rows) == 0 {
 			continue
 		}
-		chain, err := seedsearch.TraceChain(scan, rows[0], card)
-		if err != nil {
-			return fmt.Errorf("%s: %w", tbl.slug, err)
-		}
 		tableDir := filepath.Join(base, tbl.slug)
-		for _, o := range chain {
-			outDir := filepath.Join(tableDir, seedsearch.ShiftDirName(o))
-			if err := writeSimExport(outDir, o, runs); err != nil {
-				return fmt.Errorf("%s %s: %w", tbl.slug, seedsearch.ShiftDirName(o), err)
+		for _, row := range rows {
+			chain, err := seedsearch.TraceChain(scan, row, card)
+			if err != nil {
+				return fmt.Errorf("%s: %w", tbl.slug, err)
+			}
+			for _, o := range chain {
+				outDir := filepath.Join(tableDir, seedsearch.ShiftDirName(o))
+				if err := writeSimExport(outDir, o, runs); err != nil {
+					return fmt.Errorf("%s %s: %w", tbl.slug, seedsearch.ShiftDirName(o), err)
+				}
 			}
 		}
 	}
@@ -99,6 +102,27 @@ func writeSimExport(outDir string, o seedsearch.Outcome, runs int) error {
 
 	results := sim.RunMonteCarlo(state, runs, o.Seed, cfg)
 	report := stats.Build(state.PlayerCosts(), results)
+
+	for loopNum, mcRun := range sim.LoopTraceRunIndices(results, 1) {
+		loopRNG := rand.New(rand.NewSource(o.Seed + int64(mcRun)))
+		loopRes, loopSnaps := sim.RunTrace(state, loopRNG, cfg)
+		loopMeta := render.TraceMeta{
+			Shift: loopRes.Shift,
+			Costs: traceCosts,
+		}
+		seq := loopNum + 1
+		if err := render.WriteLoopTrace(seq, mcRun, loopMeta, loopSnaps, outDir); err != nil {
+			return fmt.Errorf("trace loop%d (MC %d): %w", seq, mcRun, err)
+		}
+		loopDir, _ := filepath.Abs(filepath.Join(outDir, fmt.Sprintf("loop%d", seq)))
+		traceIndex = append(traceIndex, render.TraceIndexEntry{
+			Run:           seq,
+			MonteCarloRun: mcRun,
+			Kind:          render.TraceKindLoop,
+			Steps:         len(loopSnaps),
+			Dir:           loopDir,
+		})
+	}
 
 	for winNum, mcRun := range sim.WinTraceRunIndices(results, 1) {
 		winRNG := rand.New(rand.NewSource(o.Seed + int64(mcRun)))

@@ -11,13 +11,14 @@ import (
 
 // Bar is a single-line terminal progress indicator.
 type Bar struct {
-	out    io.Writer
-	label  string
-	total  int64
-	done   int64
-	width  int
-	start  time.Time
-	closed bool
+	out        io.Writer
+	label      string
+	total      int64
+	done       int64
+	width      int
+	start      time.Time
+	lastRender time.Time
+	closed     bool
 }
 
 // NewBar creates a progress bar for total items. width is the bar character count.
@@ -42,6 +43,15 @@ func NewBarTo(w io.Writer, label string, total int64, width int) *Bar {
 	}
 }
 
+// SetLabel updates the text shown before the bar.
+func (b *Bar) SetLabel(label string) {
+	if b.closed {
+		return
+	}
+	b.label = label
+	b.maybeRender(false)
+}
+
 // SetTotal updates the expected item count (e.g. when branching work grows).
 func (b *Bar) SetTotal(total int64) {
 	if b.closed || total < 1 {
@@ -51,7 +61,7 @@ func (b *Bar) SetTotal(total int64) {
 	if b.done > b.total {
 		b.done = b.total
 	}
-	b.render()
+	b.maybeRender(false)
 }
 
 // Set updates the completed item count and redraws the bar.
@@ -63,7 +73,7 @@ func (b *Bar) Set(done int64) {
 		done = b.total
 	}
 	b.done = done
-	b.render()
+	b.maybeRender(false)
 }
 
 // Finish marks the bar complete and prints a trailing newline.
@@ -72,9 +82,21 @@ func (b *Bar) Finish() {
 		return
 	}
 	b.done = b.total
-	b.render()
+	b.maybeRender(true)
 	fmt.Fprintln(b.out)
 	b.closed = true
+}
+
+func (b *Bar) maybeRender(force bool) {
+	if b.closed {
+		return
+	}
+	now := time.Now()
+	if !force && !b.lastRender.IsZero() && now.Sub(b.lastRender) < time.Second {
+		return
+	}
+	b.lastRender = now
+	b.render()
 }
 
 func (b *Bar) render() {

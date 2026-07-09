@@ -26,7 +26,7 @@ func narrate(event string, resolved *Chip, b *board.State, queue []Chip, emitted
 	case "Waerme-Reflektion":
 		if resolved != nil {
 			return fmt.Sprintf(
-				"Wärme prallt an der Außenwand ab und fliegt in Richtung %s.",
+				"Wärme prallt an der Wand ab und fliegt in Richtung %s.",
 				dirName(resolved.Dir),
 			)
 		}
@@ -108,10 +108,10 @@ func narrateWithoutChip(event string, b *board.State, queue []Chip) string {
 	case "Waerme-Reflektion":
 		for _, c := range queue {
 			if c.Type == ChipHeat {
-				return fmt.Sprintf("Wärme prallt an der Außenwand ab und fliegt in Richtung %s.", dirName(c.Dir))
+				return fmt.Sprintf("Wärme prallt an der Wand ab und fliegt in Richtung %s.", dirName(c.Dir))
 			}
 		}
-		return "Wärme prallt an der Außenwand ab."
+		return "Wärme prallt an der Wand ab."
 	case "Spannungs-Spike":
 		for _, c := range queue {
 			if c.Type == ChipVoltage {
@@ -149,6 +149,11 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip, emit
 	switch event {
 	case "Feldreaktion", "Notgenerator zerstoert":
 		return narrateFieldHit(chip, target, tile, queue, emitted, event == "Notgenerator zerstoert")
+	case "Kondensator explodiert":
+		if len(emitted) > 0 {
+			return fmt.Sprintf("Kondensator-Bank explodiert — %s", formatDirRolls(emitted))
+		}
+		return "Kondensator-Bank explodiert."
 	case "Turbine":
 		emitted := emittedAt(queue, target)
 		if chip.Type == ChipHeat {
@@ -170,6 +175,8 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip, emit
 		return fmt.Sprintf("%s erfüllt einen Bedarfs-Chip.", chipName(chip.Type))
 	case "Ausgebrannt":
 		return fmt.Sprintf("%s trifft ausgebranntes Feld (%s) und verpufft.", chipName(chip.Type), fieldShortName(tile.Type))
+	case "Weiterleitung":
+		return fmt.Sprintf("%s trifft ausgebrannte %s und wird in eine zufällige Richtung weitergeleitet.", chipName(chip.Type), fieldShortName(tile.Type))
 	case "Innere Wand":
 		return fmt.Sprintf("%s wird von der inneren Wand gestoppt.", chipName(chip.Type))
 	case "Waerme verpufft":
@@ -266,14 +273,14 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 
 	case field.Ground:
 		if chip.Type == ChipVoltage && len(released) == 0 {
-			return fmt.Sprintf("Spannung trifft Erdung und wird abgeleitet (Ladung %d).", tile.Charge)
+			return "Spannung trifft Erdung und wird abgeleitet."
 		}
 
 	case field.CapacitorBank, field.PumpedStorage, field.LeadAccumulator:
 		if chip.Type == ChipVoltage && len(released) == 0 {
 			return fmt.Sprintf("Spannung wird im %s gespeichert (%d Ladung).", name, tile.StoredVoltage)
 		}
-		if len(released) > 0 {
+		if len(released) > 0 && tile.Type != field.Empty {
 			return fmt.Sprintf("%s ist voll — Spannungs-Spike in Richtung %s.", name, dirName(released[0].Dir))
 		}
 

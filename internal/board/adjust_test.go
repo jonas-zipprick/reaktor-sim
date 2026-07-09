@@ -6,10 +6,10 @@ import (
 )
 
 func TestSpendShiftBudgetRemovesAndPlaces(t *testing.T) {
-	prev := Random(rand.New(rand.NewSource(42)))
+	prev := Random(rand.New(rand.NewSource(42)), 0)
 	unchanged := prev.Clone()
 
-	if err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 1, 0); err != nil {
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 3, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if prev.PlayerCosts() == unchanged.PlayerCosts() {
@@ -18,12 +18,12 @@ func TestSpendShiftBudgetRemovesAndPlaces(t *testing.T) {
 }
 
 func TestSpendShiftBudgetDeterministic(t *testing.T) {
-	a := Random(rand.New(rand.NewSource(5)))
-	b := Random(rand.New(rand.NewSource(5)))
-	if err := SpendShiftBudget(rand.New(rand.NewSource(3)), a, 4, 2); err != nil {
+	a := Random(rand.New(rand.NewSource(5)), 0)
+	b := Random(rand.New(rand.NewSource(5)), 0)
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(3)), a, 4, 2, 0); err != nil {
 		t.Fatal(err)
 	}
-	if err := SpendShiftBudget(rand.New(rand.NewSource(3)), b, 4, 2); err != nil {
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(3)), b, 4, 2, 0); err != nil {
 		t.Fatal(err)
 	}
 	if a.PlayerCosts() != b.PlayerCosts() {
@@ -32,9 +32,9 @@ func TestSpendShiftBudgetDeterministic(t *testing.T) {
 }
 
 func TestSpendShiftBudgetZeroLeavesBoard(t *testing.T) {
-	prev := Random(rand.New(rand.NewSource(99)))
+	prev := Random(rand.New(rand.NewSource(99)), 0)
 	before := prev.Clone()
-	if err := SpendShiftBudget(rand.New(rand.NewSource(1)), prev, 0, 0); err != nil {
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(1)), prev, 0, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	if prev.PlayerCosts() != before.PlayerCosts() {

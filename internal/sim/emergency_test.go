@@ -58,7 +58,7 @@ func TestEmergencyGeneratorBoundChargeRemoved(t *testing.T) {
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.EmergencyGenerator, 0, 0)
 	if s.Tiles[pos.Q][pos.R].Charge != 2 {
-		t.Fatalf("setup charge = %d", s.Tiles[pos.Q][pos.R].Charge)
+		t.Fatalf("setup charge = %d, want 2", s.Tiles[pos.Q][pos.R].Charge)
 	}
 
 	cfg := sim.DefaultConfig()

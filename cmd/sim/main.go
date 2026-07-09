@@ -34,11 +34,12 @@ func main() {
 	damageW := flag.Int("damage-w", 0, "Schaden Wohnviertel (W)")
 	damageB := flag.Int("damage-b", 0, "Schaden Bahn (b)")
 	damageR := flag.Int("damage-r", 0, "Schaden Reaktoreigenbedarf (R)")
-	costP1 := flag.Int("cost-p1", 0, "Brettkosten Spieler 1 / Reaktor in Geld (0 = zufaellig)")
-	costP2 := flag.Int("cost-p2", 0, "Brettkosten Spieler 2 / Stromnetz in Geld (0 = zufaellig)")
+	costP1 := flag.Int("cost-p1", 0, "Schicht-Budget Spieler 1 / Reaktor in Geld (0 = zufaellig, nicht alles muss ausgegeben werden)")
+	costP2 := flag.Int("cost-p2", 0, "Schicht-Budget Spieler 2 / Stromnetz in Geld (0 = zufaellig, nicht alles muss ausgegeben werden)")
 	prevBoard := flag.String("prev-board", "", "Board-Fingerprint des bezahlten Bretts der Vorschicht")
 	financeID := flag.String("finanz-karte", "", "Finanz-Karte fuer Schicht-Budget (Schaden-Reparatur): "+financeCardIDs())
-	repairBudget := flag.Int("repair-budget", -1, "Max. Geld fuer Schaden-Reparatur je Lauf (1 Geld/Chip); -1 = Restbudget Stromnetz")
+	repairBudget := flag.Int("repair-budget", -1, "Max. Geld fuer Schaden-Reparatur je Lauf (1 Geld/Chip); -1 = gesamtes Restbudget Stromnetz nach Feld-Kauf")
+	monthFilter := flag.Int("month-filter", 0, "Kampagnenmonat: nur dann verfuegbare Felder kaufen (0 = alle)")
 	flag.Parse()
 
 	for name, v := range map[string]int{
@@ -72,6 +73,9 @@ func main() {
 	if *traceWin < 0 {
 		log.Fatal("-trace-win muss >= 0 sein")
 	}
+	if *monthFilter < 0 {
+		log.Fatal("-month-filter muss >= 0 sein")
+	}
 
 	if err := os.RemoveAll(*outDir); err != nil {
 		log.Fatalf("Ausgabeverzeichnis leeren: %v", err)
@@ -83,6 +87,7 @@ func main() {
 	rng := rand.New(rand.NewSource(*seed))
 
 	var state *board.State
+	var leftover board.PlayerLeftover
 	var err error
 	switch {
 	case *prevBoard != "":
@@ -91,12 +96,12 @@ func main() {
 			log.Fatalf("prev-board: %v", err)
 		}
 		if *costP1 > 0 || *costP2 > 0 {
-			err = board.SpendShiftBudget(rng, state, *costP1, *costP2)
+			leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter)
 		}
 	case *costP1 > 0 || *costP2 > 0:
-		state, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2)
+		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter)
 	default:
-		state = board.Random(rng)
+		state = board.Random(rng, *monthFilter)
 	}
 	if err != nil {
 		log.Fatal(err)
@@ -122,7 +127,7 @@ func main() {
 	cfg.Shift = 1
 	cfg.RandomShift = false
 	cfg.ShiftDemands = shiftDemands
-	cfg.RepairBudget = repairBudgetForRun(state, shiftDamage, financeCard, *repairBudget)
+	cfg.RepairBudget = repairBudgetForRun(state, financeCard, *repairBudget, leftover.Player2)
 	preview := state.Clone()
 	preview.ApplyDemands(cfg.ShiftDemands)
 	previewChips := sim.EmitterChips(preview, cfg, rng)
@@ -132,13 +137,21 @@ func main() {
 	fmt.Printf("Board-Fingerprint: %s\n", boardFP)
 	boardCosts := state.PlayerCosts()
 	fmt.Printf("Board-Kosten: %s (gesamt %d Geld)\n", boardCosts.String(), boardCosts.Total())
+	if *monthFilter > 0 {
+		fmt.Printf("Monats-Filter: %d (nur ab diesem Monat verfuegbare Felder)\n", *monthFilter)
+	}
+	if leftover.Player1 > 0 || leftover.Player2 > 0 {
+		fmt.Printf("Restbudget: Reaktor %d Geld | Stromnetz %d Geld\n", leftover.Player1, leftover.Player2)
+	}
 	fmt.Printf("Bedarfe: I=%d W=%d b=%d R=%d | Schaden: I=%d W=%d b=%d R=%d\n",
 		shiftDemands.Industry, shiftDemands.Residential, shiftDemands.Rail, shiftDemands.Plant,
 		shiftDamage.Industry, shiftDamage.Residential, shiftDamage.Rail, shiftDamage.Plant)
 	if cfg.RepairBudget > 0 {
-		fmt.Printf("Schaden-Reparatur: bis zu %d Geld je Lauf (zufaellige Chips)\n", cfg.RepairBudget)
-	} else if totalShiftDamage(shiftDamage) > 0 {
-		fmt.Println("Schaden-Reparatur: kein Restbudget Stromnetz (-finanz-karte fuer Reparatur-Budget)")
+		fmt.Printf("Schaden-Reparatur: bis zu %d Geld je Lauf (Restbudget Stromnetz, zufaellige Chips)\n", cfg.RepairBudget)
+	} else if state.TotalPlayer2Damage() > 0 && leftover.Player2 > 0 && financeCard.RepairsAllowed() {
+		fmt.Println("Schaden-Reparatur: kein Restbudget Stromnetz nach Feld-Kauf")
+	} else if state.TotalPlayer2Damage() > 0 && !financeCard.RepairsAllowed() {
+		fmt.Println("Schaden-Reparatur: nicht bewilligt (Finanz-Karte)")
 	}
 	printDemands(preview)
 
@@ -345,28 +358,19 @@ func financeCardIDs() string {
 	return strings.Join(ids, ", ")
 }
 
-func totalShiftDamage(d board.ShiftDemands) int {
-	return d.Industry + d.Residential + d.Rail + d.Plant
-}
-
-func repairBudgetForRun(state *board.State, damage board.ShiftDemands, fin finance.Card, flagBudget int) int {
-	total := totalShiftDamage(damage)
+func repairBudgetForRun(state *board.State, fin finance.Card, flagBudget, leftoverP2 int) int {
+	if !fin.RepairsAllowed() {
+		return 0
+	}
+	total := state.TotalPlayer2Damage()
 	if total == 0 {
 		return 0
 	}
-	budget := flagBudget
-	if budget < 0 {
-		if fin.ID != "" {
-			budget = fin.GridBudget - state.PlayerCosts().Player2
-		} else {
-			budget = total
+	if flagBudget >= 0 {
+		if flagBudget > total {
+			return total
 		}
+		return flagBudget
 	}
-	if budget > total {
-		budget = total
-	}
-	if budget < 0 {
-		return 0
-	}
-	return budget
+	return board.GridRepairBudget(leftoverP2, state)
 }

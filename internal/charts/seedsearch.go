@@ -10,13 +10,36 @@ import (
 	"github.com/jonas/reaktor-sim/internal/stats"
 )
 
-// WriteSeedsearchCharts saves distribution histograms across winning seeds only.
+// WriteSeedsearchCharts saves distribution histograms per seed.
 func WriteSeedsearchCharts(outDir string, outcomes []seedsearch.Outcome, runs int) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
 
-	outcomes = seedsearch.WinningOnly(outcomes)
+	allSeedMetrics := []seedsearchMetric{
+		{
+			title:    "Verteilung uebrige Bedarfe je Seed",
+			filename: "verteilung_end_bedarf.png",
+			xLabel:   "Bedarf gesamt",
+			bucket:   func(o seedsearch.Outcome) int { return o.TotalMedianEndDemand() },
+		},
+		{
+			title:    "Verteilung Schaden je Seed",
+			filename: "verteilung_end_schaden.png",
+			xLabel:   "Schaden gesamt",
+			bucket:   func(o seedsearch.Outcome) int { return o.TotalMedianEndDamage() },
+		},
+	}
+	for _, m := range allSeedMetrics {
+		h := outcomeHistogram(outcomes, m.bucket)
+		title := fmt.Sprintf("%s (%d Seeds, %d Laeufe je Seed)", m.title, len(outcomes), runs)
+		path := filepath.Join(outDir, m.filename)
+		if err := writeHistogram(h, title, m.xLabel, path); err != nil {
+			return fmt.Errorf("%s: %w", m.filename, err)
+		}
+	}
+
+	winning := seedsearch.WinningOnly(outcomes)
 
 	metrics := []seedsearchMetric{
 		{
@@ -81,9 +104,9 @@ func WriteSeedsearchCharts(outDir string, outcomes []seedsearch.Outcome, runs in
 		},
 	}
 
-	seedCount := len(outcomes)
+	seedCount := len(winning)
 	for _, m := range metrics {
-		h := outcomeHistogram(outcomes, m.bucket)
+		h := outcomeHistogram(winning, m.bucket)
 		title := fmt.Sprintf("%s (%d gewinnende Seeds, %d Laeufe je Seed)", m.title, seedCount, runs)
 		path := filepath.Join(outDir, m.filename)
 		if err := writeHistogram(h, title, m.xLabel, path); err != nil {

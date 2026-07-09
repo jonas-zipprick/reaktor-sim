@@ -21,11 +21,11 @@ type Card struct {
 var Cards = []Card{
 	{
 		ID: "eroeffnungsfeier", Name: "Eröffnungsfeier", Level: 1,
-		SpecialRule: "Notgeneratoren kosten 1 Chip weniger",
+		SpecialRule: "Generatoren kosten 1 Chip weniger",
 		Shifts: [5]board.ShiftDemands{
 			{Industry: 1, Residential: 1, Rail: 0, Plant: 1},
+			{Industry: 1, Residential: 1, Rail: 0, Plant: 1},
 			{Industry: 2, Residential: 1, Rail: 0, Plant: 1},
-			{Industry: 1, Residential: 2, Rail: 0, Plant: 2},
 			{Industry: 3, Residential: 2, Rail: 1, Plant: 2},
 			{Industry: 2, Residential: 2, Rail: 1, Plant: 2},
 		},
@@ -34,10 +34,10 @@ var Cards = []Card{
 		ID: "netzoptimierung", Name: "Optimierung des lokalen Netzes", Level: 1,
 		SpecialRule: "Transformatoren kosten 1 Geld statt 2 Geld",
 		Shifts: [5]board.ShiftDemands{
-			{Industry: 1, Residential: 1, Rail: 1, Plant: 1},
-			{Industry: 2, Residential: 1, Rail: 0, Plant: 1},
+			{Industry: 0, Residential: 1, Rail: 0, Plant: 1},
+			{Industry: 0, Residential: 2, Rail: 0, Plant: 1},
 			{Industry: 1, Residential: 2, Rail: 0, Plant: 1},
-			{Industry: 2, Residential: 1, Rail: 1, Plant: 1},
+			{Industry: 1, Residential: 2, Rail: 1, Plant: 1},
 			{Industry: 1, Residential: 2, Rail: 1, Plant: 2},
 		},
 	},
@@ -45,7 +45,7 @@ var Cards = []Card{
 		ID: "technologische-transformation", Name: "Die technologische Transformation", Level: 2,
 		SpecialRule: "Uran-Platten kosten diesen Monat 4 Geld statt 5",
 		Shifts: [5]board.ShiftDemands{
-			{Industry: 2, Residential: 2, Rail: 0, Plant: 0},
+			{Industry: 2, Residential: 2, Rail: 0, Plant: 1},
 			{Industry: 3, Residential: 1, Rail: 0, Plant: 1},
 			{Industry: 2, Residential: 2, Rail: 1, Plant: 1},
 			{Industry: 3, Residential: 1, Rail: 0, Plant: 1},

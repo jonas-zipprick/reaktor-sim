@@ -40,6 +40,20 @@ func TestBorderDamageEvent(t *testing.T) {
 	}
 }
 
+func TestGridRepairBudget(t *testing.T) {
+	s := board.NewEmpty()
+	s.Damage = [4]int{2, 1, 0, 0}
+	if got := board.GridRepairBudget(0, s); got != 0 {
+		t.Fatalf("no leftover = %d, want 0", got)
+	}
+	if got := board.GridRepairBudget(2, s); got != 2 {
+		t.Fatalf("limited by money = %d, want 2", got)
+	}
+	if got := board.GridRepairBudget(10, s); got != 3 {
+		t.Fatalf("limited by damage = %d, want 3", got)
+	}
+}
+
 func TestRepairRandomDamage(t *testing.T) {
 	s := board.NewEmpty()
 	s.Damage = [4]int{2, 1, 0, 1}

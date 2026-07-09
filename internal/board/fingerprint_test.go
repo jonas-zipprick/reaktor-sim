@@ -6,7 +6,7 @@ import (
 )
 
 func TestFingerprintRoundTrip(t *testing.T) {
-	orig := Random(rand.New(rand.NewSource(123)))
+	orig := Random(rand.New(rand.NewSource(123)), 0)
 	fp := Fingerprint(orig)
 	got, err := FromFingerprint(fp)
 	if err != nil {
@@ -18,8 +18,8 @@ func TestFingerprintRoundTrip(t *testing.T) {
 }
 
 func TestFingerprintAfterShiftBudget(t *testing.T) {
-	prev := Random(rand.New(rand.NewSource(42)))
-	if err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 5, 3); err != nil {
+	prev := Random(rand.New(rand.NewSource(42)), 0)
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 5, 3, 0); err != nil {
 		t.Fatal(err)
 	}
 	got, err := FromFingerprint(Fingerprint(prev))

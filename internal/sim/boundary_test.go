@@ -75,26 +75,47 @@ func TestVoltageDeliveryConsumesDemand(t *testing.T) {
 	}
 }
 
-func TestInternalWallStopsHeat(t *testing.T) {
+func TestHeatReflectsOffInternalWall(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 4, R: 0},
-		Dir:  0, // east into internal wall toward player 2
+		Dir:  0, // east into internal wall
 	}}
 
 	rng := rand.New(rand.NewSource(4))
 	_, snaps := sim.RunTrace(board.NewEmpty(), rng, cfg)
-	found := false
 	for _, snap := range snaps {
-		if snap.Event == "Innere Wand" {
-			found = true
-			break
+		if snap.Event != "Waerme-Reflektion" {
+			continue
 		}
+		if !strings.Contains(snap.Narrative, "Richtung W") {
+			t.Fatalf("east into internal wall should reflect west, got %q", snap.Narrative)
+		}
+		return
 	}
-	if !found {
-		t.Fatal("expected internal wall to stop chip")
+	t.Fatal("expected heat reflection at internal wall")
+}
+
+func TestHeatReflectsOffInternalWallFromPlayer2(t *testing.T) {
+	cfg := testCfg()
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipHeat,
+		Pos:  hex.Coord{Q: 5, R: 2},
+		Dir:  hex.RotW.TravelDir(),
+	}}
+
+	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+	for _, snap := range snaps {
+		if snap.Event != "Waerme-Reflektion" {
+			continue
+		}
+		if !strings.Contains(snap.Narrative, "Richtung E") {
+			t.Fatalf("west into internal wall should reflect east, got %q", snap.Narrative)
+		}
+		return
 	}
+	t.Fatal("expected heat reflection from player 2 side of internal wall")
 }
 
 func TestVoltageSEDoesNotConsumePlantDemand(t *testing.T) {

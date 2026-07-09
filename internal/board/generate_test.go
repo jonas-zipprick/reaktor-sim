@@ -65,7 +65,7 @@ func TestRandomWithCostNegative(t *testing.T) {
 
 func TestAllCostsAchievableUpToMax(t *testing.T) {
 	slots := PlaceableSlots()
-	planner, err := newCostPlanner(slots)
+	planner, err := newCostPlanner(slots, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

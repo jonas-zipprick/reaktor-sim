@@ -15,6 +15,25 @@ func TestDefaultCardShift1NotAllOnes(t *testing.T) {
 	}
 }
 
+func TestNetzoptimierungShift1(t *testing.T) {
+	c, ok := energy.ByID("netzoptimierung")
+	if !ok {
+		t.Fatal("card not found")
+	}
+	d := c.ShiftDemands(1)
+	if d.Industry != 0 || d.Residential != 1 || d.Rail != 0 || d.Plant != 1 {
+		t.Fatalf("netzoptimierung shift 1 = %+v, want I0 W1 b0 R1", d)
+	}
+}
+
+func TestEroeffnungsfeierShift3(t *testing.T) {
+	c := energy.DefaultCard()
+	d := c.ShiftDemands(3)
+	if d.Industry != 2 || d.Residential != 1 || d.Rail != 0 || d.Plant != 1 {
+		t.Fatalf("eroeffnungsfeier shift 3 = %+v, want I2 W1 b0 R1", d)
+	}
+}
+
 func TestSchturmowShift5HighDemand(t *testing.T) {
 	c, ok := energy.ByID("schturmowschtschina")
 	if !ok {

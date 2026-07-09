@@ -19,21 +19,24 @@ func scanWorkers() int {
 }
 
 type scanTracker struct {
-	progress   ProgressFunc
-	done       atomic.Int64
-	totalWork  int64
-	skipped    atomic.Int64
-	errMu      sync.Mutex
-	err        error
+	progress  ProgressFunc
+	done      atomic.Int64
+	totalWork int64
+	shift     int32
+	skipped   atomic.Int64
+	errMu     sync.Mutex
+	err       error
 }
 
-func (t *scanTracker) setTotal(total int64) {
-	t.totalWork = total
-	t.report()
+func newScanTracker(progress ProgressFunc, total int64) *scanTracker {
+	if total < 1 {
+		total = 1
+	}
+	return &scanTracker{progress: progress, totalWork: total}
 }
 
-func (t *scanTracker) addTotal(delta int64) {
-	t.totalWork += delta
+func (t *scanTracker) setShift(shift int) {
+	t.shift = int32(shift)
 	t.report()
 }
 
@@ -49,7 +52,7 @@ func (t *scanTracker) report() {
 	if t.progress == nil {
 		return
 	}
-	t.progress(t.done.Load(), t.totalWork)
+	t.progress(t.done.Load(), t.totalWork, int(t.shift))
 }
 
 func (t *scanTracker) setErr(err error) {
@@ -119,7 +122,7 @@ func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, 
 					return
 				}
 				rng := rand.New(rand.NewSource(seed))
-				state, err := buildInitialBoard(rng, opts)
+				state, endLeft, err := buildInitialBoard(rng, opts)
 				if err != nil {
 					tracker.setErr(fmt.Errorf("seed %d: %w", seed, err))
 					return
@@ -129,7 +132,7 @@ func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, 
 					tracker.finish(true)
 					continue
 				}
-				out := evaluateShift(seed, state, opts, 1, "", [4]int{}, [4]int{})
+				out := evaluateShift(seed, state, opts, 1, "", [4]int{}, [4]int{}, board.PlayerLeftover{}, endLeft)
 				collector.add(out)
 				tracker.finish(false)
 			}
@@ -170,22 +173,29 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 				if tracker.error() != nil {
 					return
 				}
-				base, err := board.FromFingerprint(job.parent.fp)
+				carryFP := job.parent.carryFP
+				if carryFP == "" {
+					carryFP = job.parent.prevFP
+				}
+				base, err := board.FromFingerprint(carryFP)
 				if err != nil {
-					tracker.setErr(fmt.Errorf("schicht %d, board %s: %w", k, job.parent.fp, err))
+					tracker.setErr(fmt.Errorf("schicht %d, board %s: %w", k, carryFP, err))
 					return
 				}
 				rng := rand.New(rand.NewSource(job.seed))
-				if err := board.SpendShiftBudget(rng, base, opts.Finance.ReactorBudget, opts.Finance.GridBudget); err != nil {
+				budgetP1 := opts.Finance.ReactorBudget + job.parent.leftover.Player1
+				budgetP2 := opts.Finance.GridBudget + job.parent.leftover.Player2
+				endLeft, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter)
+				if err != nil {
 					tracker.setErr(fmt.Errorf("schicht %d: %w", k, err))
 					return
 				}
-				key := board.Fingerprint(base) + carryKey(job.parent.demand, job.parent.damage)
+				key := board.Fingerprint(base) + carryKey(job.parent.demand, job.parent.damage, job.parent.leftover)
 				if !collector.tryClaim(key) {
 					tracker.finish(true)
 					continue
 				}
-				out := evaluateShift(job.seed, base, opts, k, job.parent.fp, job.parent.demand, job.parent.damage)
+				out := evaluateShift(job.seed, base, opts, k, job.parent.prevFP, job.parent.demand, job.parent.damage, job.parent.leftover, endLeft)
 				collector.add(out)
 				tracker.finish(false)
 			}

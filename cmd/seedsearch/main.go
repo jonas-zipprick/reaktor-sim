@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,6 +32,7 @@ func main() {
 	financeID := flag.String("finanz-karte", finance.DefaultCard().ID, "Finanz-Karte (Schicht-Budget): "+financeCardIDs())
 	shifts := flag.Int("schichten", 1, "Anzahl aufeinanderfolgender Schichten (1-5, ganzer Monat = 5)")
 	shiftKeep := flag.Int("schicht-keep", 1, "Top-Boards je Rangliste, die in die naechste Schicht weiterverzweigt werden")
+	monthFilter := flag.Int("month-filter", 0, "Kampagnenmonat: nur dann verfuegbare Felder kaufen (0 = alle)")
 	flag.Parse()
 
 	if *to == 0 {
@@ -51,6 +53,9 @@ func main() {
 	if *shiftKeep < 1 {
 		log.Fatal("-schicht-keep muss >= 1 sein")
 	}
+	if *monthFilter < 0 {
+		log.Fatal("-month-filter muss >= 0 sein")
+	}
 
 	energyCard, ok := energy.ByID(*energyID)
 	if !ok {
@@ -62,11 +67,12 @@ func main() {
 	}
 
 	opts := seedsearch.Options{
-		Runs:       *runs,
-		EnergyCard: energyCard,
-		Finance:    financeCard,
-		Shifts:     *shifts,
-		ShiftKeep:  *shiftKeep,
+		Runs:        *runs,
+		EnergyCard:  energyCard,
+		Finance:     financeCard,
+		Shifts:      *shifts,
+		ShiftKeep:   *shiftKeep,
+		MonthFilter: *monthFilter,
 	}
 
 	total := *to - *from + 1
@@ -77,6 +83,9 @@ func main() {
 	fmt.Fprintf(out, "Energie-Karte: %s (Stufe %d)\n", energyCard.Name, energyCard.Level)
 	fmt.Fprintf(out, "Finanz-Karte: %s\n", financeCard.Describe())
 	fmt.Fprintf(out, "Schichten: %d (Sonderregeln werden nicht simuliert)\n", *shifts)
+	if *monthFilter > 0 {
+		fmt.Fprintf(out, "Monats-Filter: %d (nur ab diesem Monat verfuegbare Felder)\n", *monthFilter)
+	}
 	if *shifts > 1 {
 		fmt.Fprintf(out, "Schicht-Verzweigung: je %d Top-Boards aus %d Ranglisten × alle Seeds in Folgeschicht\n",
 			*shiftKeep, seedsearch.KeepTableCount)
@@ -90,8 +99,13 @@ func main() {
 	var bar *progress.Bar
 	var onProgress seedsearch.ProgressFunc
 	if *progressBar {
-		bar = progress.NewBar("Evaluations", seedsearch.EstimateScanWork(*from, *to, opts), 30)
-		onProgress = func(done, total int64) { bar.SetTotal(total); bar.Set(done) }
+		bar = progress.NewBar("Schicht 1", seedsearch.EstimateScanWork(*from, *to, opts), 30)
+		onProgress = func(done, total int64, shift int) {
+			if shift > 0 {
+				bar.SetLabel(fmt.Sprintf("Schicht %d", shift))
+			}
+			bar.Set(done)
+		}
 	}
 
 	scan, err := seedsearch.Scan(*from, *to, opts, onProgress)
@@ -121,7 +135,7 @@ func main() {
 		if err := writeCharts(*chartsDir, scan, *runs); err != nil {
 			log.Fatal(err)
 		}
-		if err := writeTopSims(*chartsDir, scan, energyCard, *runs); err != nil {
+		if err := writeTopSims(*chartsDir, scan, energyCard, *runs, *shiftKeep); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Fprintf(out, "Charts: %s/\n", *chartsDir)
@@ -213,12 +227,17 @@ var prevBoardFpCol = col{"Vorschicht-Board", 16, func(o seedsearch.Outcome) stri
 	return o.PrevBoardFingerprint
 }}
 
+var avgSavedCol = col{"ø Gespart", 9, func(o seedsearch.Outcome) string { return o.AvgSavedSummary() }}
+var avgRepairCol = col{"ø Reparatur", 11, func(o seedsearch.Outcome) string { return o.AvgRepairSummary() }}
+
 var winCols = []col{
 	{"Seed", 10, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Seed) }},
 	boardFpCol,
 	prevBoardFpCol,
 	{"P1", 4, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.BoardCosts.Player1) }},
 	{"P2", 4, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.BoardCosts.Player2) }},
+	avgSavedCol,
+	avgRepairCol,
 	{"Wins", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Wins) }},
 	{"Win%", 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%.1f", o.WinRate()*100) }},
 	{"Loops", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Loops) }},
@@ -235,6 +254,8 @@ var loopCols = []col{
 	prevBoardFpCol,
 	{"P1", 4, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.BoardCosts.Player1) }},
 	{"P2", 4, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.BoardCosts.Player2) }},
+	avgSavedCol,
+	avgRepairCol,
 	{"Loops", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Loops) }},
 	{"Loop%", 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%.1f", o.LoopRate()*100) }},
 	{"Wins", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Wins) }},
@@ -256,6 +277,8 @@ func scoreCols(scoreTitle string, score func(seedsearch.Outcome) int) []col {
 		prevBoardFpCol,
 		{"P1", 4, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.BoardCosts.Player1) }},
 		{"P2", 4, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.BoardCosts.Player2) }},
+		avgSavedCol,
+		avgRepairCol,
 		{scoreTitle, 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", score(o)) }},
 		{"%", 7, func(o seedsearch.Outcome) string {
 			if o.Runs == 0 {
@@ -329,6 +352,7 @@ type settingsYAML struct {
 	FinanceGrid    int    `yaml:"finance_grid_budget"`
 	Shifts         int    `yaml:"shifts"`
 	ShiftKeep      int    `yaml:"shift_keep"`
+	MonthFilter    int    `yaml:"month_filter,omitempty"`
 }
 
 type shiftYAML struct {
@@ -355,13 +379,21 @@ type zoneTotalsYAML struct {
 	Plant       float64 `yaml:"reaktorbedarf"`
 }
 
+type leftoverYAML struct {
+	Reaktor   int `yaml:"reaktor"`
+	Stromnetz int `yaml:"stromnetz"`
+}
+
 type outcomeYAML struct {
-	Seed                 int64          `yaml:"seed"`
-	Shift                int            `yaml:"shift"`
-	BoardFingerprint     string         `yaml:"board_fingerprint"`
-	PrevBoardFingerprint string         `yaml:"prev_board_fingerprint,omitempty"`
-	BoardCosts           costsYAML      `yaml:"board_costs"`
-	Wins                 int            `yaml:"wins"`
+	Seed                   int64          `yaml:"seed"`
+	Shift                  int            `yaml:"shift"`
+	BoardFingerprint       string         `yaml:"board_fingerprint"`
+	PrevBoardFingerprint   string         `yaml:"prev_board_fingerprint,omitempty"`
+	CarryBoardFingerprint  string         `yaml:"carry_board_fingerprint,omitempty"`
+	BoardCosts             costsYAML      `yaml:"board_costs"`
+	StartLeftover          leftoverYAML   `yaml:"start_leftover,omitempty"`
+	EndLeftover            leftoverYAML   `yaml:"end_leftover"`
+	Wins                   int            `yaml:"wins"`
 	AllDemandsNoDamage   int            `yaml:"all_demands_no_damage"`
 	Max1DemandNoDamage   int            `yaml:"max1_demand_no_damage"`
 	Max1DemandMax1Damage int            `yaml:"max1_demand_max1_damage"`
@@ -370,6 +402,8 @@ type outcomeYAML struct {
 	CriticalP2           int            `yaml:"critical_p2"`
 	AvgEndDemand         zoneTotalsYAML `yaml:"avg_end_demand"`
 	AvgEndDamage         zoneTotalsYAML `yaml:"avg_end_damage"`
+	AvgSaved             leftoverYAML   `yaml:"avg_saved"`
+	AvgRepairSpent       float64        `yaml:"avg_repair_spent"`
 	AvgSteps             float64        `yaml:"avg_steps"`
 	WinRate              float64        `yaml:"win_rate"`
 	LoopRate             float64        `yaml:"loop_rate"`
@@ -388,6 +422,7 @@ func writeYAML(path string, scan seedsearch.ScanResult, opts seedsearch.Options,
 			FinanceGrid:    opts.Finance.GridBudget,
 			Shifts:         opts.Shifts,
 			ShiftKeep:      opts.ShiftKeep,
+			MonthFilter:    opts.MonthFilter,
 		},
 	}
 	for _, sr := range scan.Shifts {
@@ -413,14 +448,23 @@ func toOutcomeYAML(in []seedsearch.Outcome) []outcomeYAML {
 	out := make([]outcomeYAML, len(in))
 	for i, o := range in {
 		out[i] = outcomeYAML{
-			Seed:                 o.Seed,
-			Shift:                o.Shift,
-			BoardFingerprint:     o.BoardFingerprint,
-			PrevBoardFingerprint: o.PrevBoardFingerprint,
+			Seed:                  o.Seed,
+			Shift:                 o.Shift,
+			BoardFingerprint:      o.BoardFingerprint,
+			PrevBoardFingerprint:  o.PrevBoardFingerprint,
+			CarryBoardFingerprint: o.CarryBoardFingerprint,
 			BoardCosts: costsYAML{
 				Reaktor:   o.BoardCosts.Player1,
 				Stromnetz: o.BoardCosts.Player2,
 				Total:     o.BoardCosts.Total(),
+			},
+			StartLeftover: leftoverYAML{
+				Reaktor:   o.StartLeftover.Player1,
+				Stromnetz: o.StartLeftover.Player2,
+			},
+			EndLeftover: leftoverYAML{
+				Reaktor:   o.EndLeftover.Player1,
+				Stromnetz: o.EndLeftover.Player2,
 			},
 			Wins:                 o.Wins,
 			AllDemandsNoDamage:   o.AllDemandsNoDamage,
@@ -431,6 +475,11 @@ func toOutcomeYAML(in []seedsearch.Outcome) []outcomeYAML {
 			CriticalP2:           o.CriticalP2,
 			AvgEndDemand:         toZoneTotalsYAML(o.AvgEndDemand),
 			AvgEndDamage:         toZoneTotalsYAML(o.AvgEndDamage),
+			AvgSaved: leftoverYAML{
+				Reaktor:   int(math.Round(o.AvgSavedP1)),
+				Stromnetz: int(math.Round(o.AvgSavedP2)),
+			},
+			AvgRepairSpent:       o.AvgRepairSpent,
 			AvgSteps:             o.AvgSteps,
 			WinRate:              o.WinRate(),
 			LoopRate:             o.LoopRate(),

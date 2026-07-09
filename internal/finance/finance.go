@@ -20,17 +20,17 @@ type Card struct {
 var Cards = []Card{
 	{
 		ID: "schwerindustrie", Name: "Triumph der Schwerindustrie",
-		ReactorBudget: 3, GridBudget: 3,
+		ReactorBudget: 3, GridBudget: 4,
 		SpecialRule: "Uran ist um 1 Geld guenstiger",
 	},
 	{
 		ID: "sparmassnahmen", Name: "Nationale Sparmaßnahmen",
-		ReactorBudget: 1, GridBudget: 1,
+		ReactorBudget: 1, GridBudget: 2,
 	},
 	{
 		ID: "wettruesten", Name: "Nukleares Wettrüsten",
-		ReactorBudget: 2, GridBudget: 3,
-		SpecialRule: "Leere (ausgebrannte) Felder duerfen nicht ueberbaut werden",
+		ReactorBudget: 2, GridBudget: 4,
+		SpecialRule: "Reparaturen nicht bewilligt; leere Felder duerfen nicht ueberbaut werden",
 	},
 }
 
@@ -48,6 +48,11 @@ func ByID(id string) (Card, bool) {
 		}
 	}
 	return Card{}, false
+}
+
+// RepairsAllowed reports whether leftover grid money may be spent on damage repair.
+func (c Card) RepairsAllowed() bool {
+	return c.ID != "wettruesten"
 }
 
 // Describe formats card name and per-shift budget for logging.

@@ -61,6 +61,19 @@ func (s *State) TotalPlayer2Damage() int {
 
 const repairCostPerChip = 1
 
+// GridRepairBudget returns how much leftover grid money can be spent on repairs
+// (1 money per damage chip) until money or damage runs out.
+func GridRepairBudget(leftoverP2 int, s *State) int {
+	if leftoverP2 <= 0 {
+		return 0
+	}
+	total := s.TotalPlayer2Damage()
+	if leftoverP2 > total {
+		return total
+	}
+	return leftoverP2
+}
+
 // RepairRandomDamage removes damage chips at 1 money each, choosing zones
 // uniformly at random until budget is spent or no damage remains.
 // Returns money spent on repairs.

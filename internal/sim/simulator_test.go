@@ -68,7 +68,7 @@ func TestRandomBoardsProduceHeat(t *testing.T) {
 	hits := 0
 	for seed := int64(1); seed < 30; seed++ {
 		rng := rand.New(rand.NewSource(seed))
-		s := board.Random(rng)
+		s := board.Random(rng, 0)
 		for i := 0; i < 100; i++ {
 			hits += sim.Run(s, rng, sim.DefaultConfig()).HeatAtTurbine
 		}

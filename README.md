@@ -78,7 +78,7 @@ Pro Seed wird ein Brett erzeugt (mit dem Schicht-Budget der Finanz-Karte) und `-
 
 ### Ganzen Monat simulieren
 
-Mit `-schichten n` werden `n` Schichten hintereinander gerechnet. Schicht 1 baut pro Seed ein Brett; jede Folgeschicht nimmt die Top-Boards der vorherigen Schicht (`-schicht-keep` je Rangliste aus 4 Erfolgs-Tabellen) und probiert sie mit **allen Seeds** erneut durch (Kauf + Simulation). Ungestillte Bedarfe und Schaden werden als Median über die Läufe kumulierend übernommen.
+Mit `-schichten n` werden `n` Schichten hintereinander gerechnet. Schicht 1 baut pro Seed ein Brett; jede Folgeschicht nimmt die Top-Boards der vorherigen Schicht (`-schicht-keep` je Rangliste aus 4 Erfolgs-Tabellen; Loops-Tabellen-Einträge werden übersprungen und durch nächste Erfolgs-Boards ersetzt) und probiert sie mit **allen Seeds** erneut durch (Kauf + Simulation). Ungestillte Bedarfe und Schaden werden als Median über die Läufe kumulierend übernommen.
 
 ```bash
 go run ./cmd/seedsearch -from 1 -to 500 -runs 50 -schichten 5 -schicht-keep 2 -energie-karte schturmowschtschina -finanz-karte sparmassnahmen -top 5

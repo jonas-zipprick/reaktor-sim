@@ -88,18 +88,18 @@ func ZoneOf(c hex.Coord) (Zone, bool) {
 }
 
 // Random generates a random legal board with fields on placeable slots.
-func Random(rng *rand.Rand) *State {
+// monthFilter limits purchasable fields (0 = no filter).
+func Random(rng *rand.Rand, monthFilter int) *State {
 	s := NewEmpty()
 	for _, c := range PlaceableSlots() {
 		if rng.Float64() >= 0.75 {
 			continue
 		}
-		var t field.Type
-		if c.IsPlayer1() {
-			t = field.ReactorMarket[rng.Intn(len(field.ReactorMarket))]
-		} else {
-			t = field.GridMarket[rng.Intn(len(field.GridMarket))]
+		market := marketFor(c, monthFilter)
+		if len(market) == 0 {
+			continue
 		}
+		t := market[rng.Intn(len(market))]
 		placeTile(s, c, t, rng)
 	}
 	return s

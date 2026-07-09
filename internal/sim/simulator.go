@@ -2,7 +2,9 @@
 package sim
 
 import (
+	"math"
 	"math/rand"
+	"sort"
 
 	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/energy"
@@ -28,7 +30,7 @@ type Chip struct {
 }
 
 // MaxStepsPerRun is the hard cap on chip resolutions per simulation run.
-const MaxStepsPerRun = 400
+const MaxStepsPerRun = 500
 
 // Result holds metrics from one simulation run.
 type Result struct {
@@ -43,6 +45,7 @@ type Result struct {
 	EndDemands        [4]int // remaining demand per board.Zone at run end
 	EndDamage         [4]int // remaining damage per board.Zone at run end
 	Shift             int    // energy-card shift used for this run (1-5)
+	RepairSpent       int    // money spent on damage repair at shift start
 }
 
 // Snapshot captures board and graph state after a simulation step.
@@ -99,24 +102,75 @@ type engine struct {
 
 // Run executes one full shift simulation on a board clone.
 func Run(state *board.State, rng *rand.Rand, cfg Config) Result {
-	res, _ := run(state, rng, cfg)
+	res, _, _ := run(state, rng, cfg)
 	return res
 }
 
 // RunTrace executes one shift and records snapshots after each chip resolution.
 func RunTrace(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 	cfg.Trace = true
-	return run(state, rng, cfg)
+	res, _, snaps := run(state, rng, cfg)
+	return res, snaps
 }
 
-func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
+// MedianRunIndex picks the run whose step count is closest to the median.
+func MedianRunIndex(results []Result) int {
+	if len(results) == 0 {
+		return 0
+	}
+	steps := make([]int, len(results))
+	for i, r := range results {
+		steps[i] = r.Steps
+	}
+	med := medianInt(steps)
+	best := 0
+	bestDist := absInt(results[0].Steps - med)
+	for i, r := range results {
+		d := absInt(r.Steps - med)
+		if d < bestDist || (d == bestDist && i < best) {
+			best = i
+			bestDist = d
+		}
+	}
+	return best
+}
+
+// ApplyShiftCarry re-runs one Monte-Carlo run and copies its post-shift-end
+// placeable tiles onto dst for multi-shift board continuity.
+func ApplyShiftCarry(dst *board.State, seed int64, runOneBased int, cfg Config) {
+	runRNG := rand.New(rand.NewSource(seed + int64(runOneBased)))
+	_, endBoard, _ := run(dst, runRNG, cfg)
+	board.CopyPlaceableTiles(dst, endBoard)
+}
+
+func medianInt(vals []int) int {
+	if len(vals) == 0 {
+		return 0
+	}
+	s := append([]int(nil), vals...)
+	sort.Ints(s)
+	n := len(s)
+	if n%2 == 1 {
+		return s[n/2]
+	}
+	return int(math.Round(float64(s[n/2-1]+s[n/2]) / 2))
+}
+
+func absInt(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func run(state *board.State, rng *rand.Rand, cfg Config) (Result, *board.State, []Snapshot) {
 	e := &engine{
 		board: state.Clone(),
 		rng:   rng,
 		cfg:   cfg,
 	}
 	if cfg.RepairBudget > 0 {
-		e.board.RepairRandomDamage(e.rng, cfg.RepairBudget)
+		e.res.RepairSpent = e.board.RepairRandomDamage(e.rng, cfg.RepairBudget)
 	}
 	shift, demands := cfg.runShiftAndDemands(e.rng)
 	e.res.Shift = shift
@@ -128,12 +182,13 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 	} else {
 		e.queue = append(e.queue, EmitterChips(e.board, cfg, e.rng)...)
 	}
+	e.queue = append(e.queue, shiftStartChips(e.board, e.rng)...)
 	e.graph = graph.BuildFlow(e.board, e.inFlight())
 
 	e.record("Start")
 	if e.checkCritical() {
 		e.captureEndState()
-		return e.res, finalizeTrace(e.trace)
+		return e.res, e.board, finalizeTrace(e.trace)
 	}
 	for !e.res.CriticalFailure && e.step < cfg.MaxSteps {
 		if len(e.queue) > 0 {
@@ -157,12 +212,13 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, []Snapshot) {
 		e.abortStepLimit()
 	}
 	if !e.res.CriticalFailure && !e.res.StepLimitExceeded {
+		shiftEndCleanup(e.board)
 		e.record("Ende")
 	}
 	e.res.AllDemandsMet = AllDemandsMet(e.board)
 	e.captureEndState()
 
-	return e.res, finalizeTrace(e.trace)
+	return e.res, e.board, finalizeTrace(e.trace)
 }
 
 func (e *engine) captureEndState() {
@@ -329,6 +385,9 @@ func (e *engine) resolve(chip Chip) {
 		e.recordStep("Leeres Feld", nil)
 		return
 	}
+	if tile.BurnedOut && tryBurnedRedirect(e, nextPos, tile, chip) {
+		return
+	}
 	if tile.BurnedOut {
 		e.recordStep("Ausgebrannt", &chip)
 		return
@@ -336,6 +395,7 @@ func (e *engine) resolve(chip Chip) {
 
 	chargeBefore := tile.Charge
 	incoming := (chip.Dir + 3) % 6
+	tileTypeBefore := tile.Type
 
 	destroyedEmergencyGen := tile.Type == field.EmergencyGenerator && chip.Type == ChipVoltage
 	newChips, graphChanged := react(e.board, e.graph, nextPos, tile, chip, incoming, e.rng)
@@ -358,8 +418,64 @@ func (e *engine) resolve(chip Chip) {
 	event := "Feldreaktion"
 	if destroyedEmergencyGen {
 		event = "Notgenerator zerstoert"
+	} else if tileTypeBefore == field.CapacitorBank && tile.Type == field.Empty && len(newChips) > 0 {
+		event = "Kondensator explodiert"
 	}
 	e.recordStep(event, &chip)
+}
+
+func tryBurnedRedirect(e *engine, pos hex.Coord, tile *field.Tile, chip Chip) bool {
+	if !tile.BurnedOut {
+		return false
+	}
+	switch tile.Type {
+	case field.CoalChamber:
+		if chip.Type != ChipHeat {
+			return false
+		}
+	case field.Transformer:
+		// any chip type
+	default:
+		return false
+	}
+	out := emitRandom(pos, e.rng, chip.Type, 1)
+	e.queue = append(e.queue, out...)
+	e.recordStep("Weiterleitung", &chip)
+	return true
+}
+
+// shiftStartChips releases one stored voltage from each Blei-Akkumulator at shift start.
+func shiftStartChips(b *board.State, rng *rand.Rand) []Chip {
+	var out []Chip
+	for _, c := range hex.AllBoardCoords {
+		t := &b.Tiles[c.Q][c.R]
+		if t.Type == field.LeadAccumulator && t.StoredVoltage > 0 {
+			t.StoredVoltage--
+			out = append(out, Chip{
+				Type: ChipVoltage,
+				Pos:  c,
+				Dir:  hex.RandomTravelDir(rng),
+			})
+		}
+	}
+	return out
+}
+
+// shiftEndCleanup applies end-of-shift board cleanup per game rules: capacitor
+// storage is cleared and depleted placeable fields are removed from the board.
+func shiftEndCleanup(b *board.State) {
+	for _, c := range hex.AllBoardCoords {
+		t := &b.Tiles[c.Q][c.R]
+		if t.Type == field.CapacitorBank {
+			t.StoredVoltage = 0
+		}
+	}
+	for _, c := range board.PlaceableSlots() {
+		t := &b.Tiles[c.Q][c.R]
+		if t.BurnedOut {
+			*t = field.Tile{Type: field.Empty}
+		}
+	}
 }
 
 // reflectOffWall bounces a heat chip off the outer wall. If the chip sits on a
@@ -389,6 +505,16 @@ func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
 			}
 			e.board.AddZoneDamage(board.ZonePlant)
 			e.recordStep(board.BorderDamageEvent(board.ZonePlant), &chip)
+			return
+		}
+		if chip.Type == ChipHeat {
+			reflected := Chip{
+				Type: ChipHeat,
+				Pos:  chip.Pos,
+				Dir:  e.reflectOffWall(chip.Pos, chip.Dir),
+			}
+			e.queue = append(e.queue, reflected)
+			e.recordStep("Waerme-Reflektion", &reflected)
 			return
 		}
 		e.recordStep("Innere Wand", &chip)
@@ -656,23 +782,28 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return handleFuel(tile, chip, pos, rng, 1, 2, ChipVoltage)
 
 	case field.Ground:
-		if chip.Type != ChipVoltage || tile.Charge <= 0 {
-			if tile.BurnedOut {
-				return nil, false
-			}
+		if chip.Type != ChipVoltage {
 			return passThrough(chip, pos), false
-		}
-		tile.Charge--
-		if tile.Charge <= 0 {
-			tile.BurnedOut = true
-			graphChanged = true
 		}
 		return nil, false
 
 	case field.HVCascade:
 		return handleFuel(tile, chip, pos, rng, 3, 4, ChipVoltage)
 
-	case field.CapacitorBank, field.PumpedStorage, field.LeadAccumulator:
+	case field.CapacitorBank:
+		if chip.Type != ChipVoltage {
+			return passThrough(chip, pos), false
+		}
+		max := field.Catalog[field.CapacitorBank].MaxCharge
+		if tile.StoredVoltage < max {
+			tile.StoredVoltage++
+			return nil, false
+		}
+		count := tile.StoredVoltage + 1
+		*tile = field.Tile{Type: field.Empty}
+		return emitRandom(pos, rng, ChipVoltage, count), true
+
+	case field.PumpedStorage, field.LeadAccumulator:
 		if chip.Type != ChipVoltage {
 			return passThrough(chip, pos), false
 		}

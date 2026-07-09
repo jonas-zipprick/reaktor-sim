@@ -33,11 +33,12 @@ const (
 
 // Info holds static metadata for a field type.
 type Info struct {
-	Name          string
-	Cost          int
-	InitialCharge int // -1 = infinite, -2 = special storage max
-	MaxCharge     int
-	Sector        string // "reactor" or "grid"
+	Name               string
+	Cost               int
+	InitialCharge      int // -1 = infinite, -2 = special storage max
+	MaxCharge          int
+	Sector             string // "reactor" or "grid"
+	AvailableFromMonth int    // earliest campaign month (1 = from start)
 }
 
 var Catalog = map[Type]Info{
@@ -45,19 +46,19 @@ var Catalog = map[Type]Info{
 	Mirror:             {Name: "Ablenk-Spiegel", Cost: 1, Sector: "reactor"},
 	CoalChamber:        {Name: "Kohle-Brennkammer", Cost: 2, InitialCharge: 4, MaxCharge: 4, Sector: "reactor"},
 	CoolingTower:       {Name: "Kühlturm", Cost: 2, Sector: "reactor"},
-	GasBoiler:          {Name: "Erdgas-Kessel", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "reactor"},
-	AbsorberRod:        {Name: "Absorber-Stab", Cost: 3, Sector: "reactor"},
-	UraniumPlate:       {Name: "Uran-Platte", Cost: 5, InitialCharge: 2, MaxCharge: 2, Sector: "reactor"},
-	Tokamak:            {Name: "Tokamak-Kammer", Cost: 8, InitialCharge: -1, Sector: "reactor"},
+	GasBoiler:          {Name: "Erdgas-Kessel", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "reactor", AvailableFromMonth: 2},
+	AbsorberRod:        {Name: "Absorber-Stab", Cost: 3, Sector: "reactor", AvailableFromMonth: 3},
+	UraniumPlate:       {Name: "Uran-Platte", Cost: 5, InitialCharge: 2, MaxCharge: 2, Sector: "reactor", AvailableFromMonth: 3},
+	Tokamak:            {Name: "Tokamak-Kammer", Cost: 8, InitialCharge: -1, Sector: "reactor", AvailableFromMonth: 4},
 	Relay:              {Name: "Relais/Weiche", Cost: 1, Sector: "grid"},
-	Transformer:        {Name: "Transformator", Cost: 2, InitialCharge: 4, MaxCharge: 4, Sector: "grid"},
-	Ground:             {Name: "Erdung/Widerstand", Cost: 2, InitialCharge: 4, MaxCharge: 4, Sector: "grid"},
-	EmergencyGenerator: {Name: "Notgenerator", Cost: 3, InitialCharge: 2, Sector: "grid"},
-	LeadAccumulator:    {Name: "Blei-Akkumulator", Cost: 3, MaxCharge: 3, Sector: "grid"},
-	CapacitorBank:      {Name: "Kondensator-Bank", Cost: 4, MaxCharge: 5, Sector: "grid"},
-	PumpedStorage:      {Name: "Pumpspeicherwerk", Cost: 4, MaxCharge: 5, Sector: "grid"},
-	HVCascade:          {Name: "Hochspannungs-Kaskade", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "grid"},
-	Superconductor:     {Name: "Supraleiter", Cost: 4, Sector: "grid"},
+	Transformer:        {Name: "Transformator", Cost: 2, InitialCharge: 6, MaxCharge: 6, Sector: "grid"},
+	Ground:             {Name: "Erdung/Widerstand", Cost: 1, Sector: "grid"},
+	EmergencyGenerator: {Name: "Notgenerator", Cost: 3, InitialCharge: 2, MaxCharge: 2, Sector: "grid"},
+	LeadAccumulator:    {Name: "Blei-Akkumulator", Cost: 3, MaxCharge: 2, Sector: "grid", AvailableFromMonth: 2},
+	CapacitorBank:      {Name: "Kondensator-Bank", Cost: 4, MaxCharge: 5, Sector: "grid", AvailableFromMonth: 2},
+	PumpedStorage:      {Name: "Pumpspeicherwerk", Cost: 4, MaxCharge: 5, Sector: "grid", AvailableFromMonth: 3},
+	HVCascade:          {Name: "Hochspannungs-Kaskade", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "grid", AvailableFromMonth: 3},
+	Superconductor:     {Name: "Supraleiter", Cost: 4, Sector: "grid", AvailableFromMonth: 4},
 }
 
 // ReactorMarket lists placeable reactor fields for random generation.
