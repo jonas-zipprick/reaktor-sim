@@ -27,6 +27,7 @@ func RandomWithPlayerCosts(rng *rand.Rand, budgetP1, budgetP2, monthFilter int, 
 	}
 
 	s := NewEmpty()
+	ApplyRandomShiftRotations(rng, s)
 	left1, err := spendUpToOnSlots(rng, s, slotsForPlayer(true), budgetP1, "Spieler 1 (Reaktor)", monthFilter, month)
 	if err != nil {
 		return nil, PlayerLeftover{}, err
@@ -51,6 +52,7 @@ func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2, monthFilter 
 	if budgetP1 < 0 || budgetP2 < 0 {
 		return PlayerLeftover{}, fmt.Errorf("Schicht-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
 	}
+	ApplyRandomShiftRotations(rng, s)
 	left1, err := spendHalfBudget(rng, s, true, budgetP1, monthFilter, month)
 	if err != nil {
 		return PlayerLeftover{}, err

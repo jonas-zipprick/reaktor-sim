@@ -42,9 +42,10 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 * Die offene **Energie-Karte** gibt den genauen Schichtplan vor, den das Städtische Netz in diesem Monat verlangt, sowie technische Sonderregeln. Schaut auf den Schichtplan, verteilt Bedarfschips auf die Spielfeldränder der Seite des Spielers 2\.  
 * Die offene **Finanz-Karte** gibt an, wie viel **Geld** ihr beide zu Beginn *jeder einzelnen Schicht* dieses Monats erhaltet. (Gespartes Geld aus dem Monat davor verfällt). Nehmt euch jetzt die entsprechende Anzahl Geldscheine für diese Schicht.
 
-**2\. Kaufen & Bauen (Start der Schicht):** Ihr kauft Felder aus dem Markt und legt sie in euer Raster. Schiebt die Geldschieber entsprechend der Kosten nach links. Sobald ein Feld gelegt wird, wird es mit Chips aus dem allgemeinen Vorrat als "Ladung" befüllt. Spieler 2 kann auch 1 Geld pro Schadenschip ausgeben um Schaden von Zonen zu entfernen.
-**3\. Zünden (Kostenlos):** Spieler 1 feuert am Zünder (am linken Rand) genau **1 Basis-Trigger** (Wärme-Chip oder Neutron) in eine gewählte Richtung ab. Spieler 2 feuert an der Turbine oder befriedigt direkt einen Bedarf im Kraftwerk. Das Feuern des Zünders ist optional.
-**4\. Simulation:** Trifft ein fliegender Chip auf ein Feld, passiert Folgendes:
+**2\. Felder neu ausrichten:** Dreht beliebig viele bereits plazierte Felder
+**3\. Kaufen & Bauen (Start der Schicht):** Ihr kauft Felder aus dem Markt und legt sie in euer Raster. Schiebt die Geldschieber entsprechend der Kosten nach links. Sobald ein Feld gelegt wird, wird es mit Chips aus dem allgemeinen Vorrat als "Ladung" befüllt. Spieler 2 kann auch 1 Geld pro Schadenschip ausgeben um Schaden von Zonen zu entfernen.
+**4\. Zünden (Kostenlos):** Spieler 1 feuert am Zünder (am linken Rand) genau **1 Basis-Trigger** (Wärme-Chip oder Neutron) in eine gewählte Richtung ab. Spieler 2 feuert an der Turbine oder befriedigt direkt einen Bedarf im Kraftwerk. Das Feuern des Zünders ist optional.
+**5\. Simulation:** Trifft ein fliegender Chip auf ein Feld, passiert Folgendes:
 
 * *Flugbahn:*   
   * Chips fliegen in geraden Linien  
@@ -187,6 +188,7 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * *Historischer Kontext: In der Anlage Majak fiel 1957 das Kühlsystem für nukleare Abfälle aus. Da das Finanzbüro keine Reparaturmittel bewilligte (um die Produktion nicht zu stören), überhitzte ein Tank und löste den drittschwersten Nuklearunfall der Geschichte aus (Kyshtym-Vorfall).*
 
 ## **6\. Sektor 1: Der Reaktor (Felder für Spieler 1\)**
+* **Feld drehen (Kosten: 0):** Drehe ein bereits plaziertes Feld
 
 * **Schaden reparieren (Kosten: 1):** Entferne 1 Schadens-Chip vom Zünder
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
@@ -203,6 +205,7 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * **Tokamak-Kammer (Kosten: 8 Geld | Ladung: Unendlich | ab 4\. Monat):** 4 Neutronen treffen ein \-\> feuert 8 Wärme ab
 
 ## **7\. Sektor 2: Das Stromnetz (Felder für Spieler 2\)**
+* **Feld drehen (Kosten: 0):** Drehe ein bereits plaziertes Feld
 
 * **Schaden reparieren (Kosten: 1):** Entferne 1 Schadens-Chip von einer der 4 Zonen
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld

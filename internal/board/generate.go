@@ -82,10 +82,14 @@ func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget 
 	}
 	for _, c := range slots {
 		vacant := slotIsVacant(c, s)
+		existing := s.tileAt(c)
 		for _, tileType := range market {
 			cost := month.FieldCost(tileType)
 			if cost > budget {
 				continue
+			}
+			if !vacant && existing != nil && existing.Type == tileType {
+				continue // same-type refresh on live fields: use free shift rotation
 			}
 			// Any slot can be built on: vacant slots are "place", occupied ones are
 			// "overbuild" (full new-field cost, fresh charge/orientation).

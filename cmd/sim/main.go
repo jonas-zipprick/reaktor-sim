@@ -106,9 +106,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("prev-board: %v", err)
 		}
-		if *costP1 > 0 || *costP2 > 0 {
-			leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, monthRules)
-		}
+		leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, monthRules)
 	case *costP1 > 0 || *costP2 > 0:
 		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter, monthRules)
 	default:

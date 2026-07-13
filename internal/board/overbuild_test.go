@@ -30,6 +30,19 @@ func TestValidShiftActionsAllowsOverbuildOnOccupiedSlot(t *testing.T) {
 	}
 }
 
+func TestValidShiftActionsSkipsSameTypeOverbuildOnLiveField(t *testing.T) {
+	pos := hex.Coord{Q: 1, R: 1}
+	s := NewEmpty()
+	s.Tiles[pos.Q][pos.R] = field.NewTile(field.Mirror, hex.RotE, 0)
+
+	actions := validShiftActions(s, slotsForPlayer(true), marketFor(pos, 0), 3, rules.Month{})
+	for _, a := range actions {
+		if a.coord == pos && a.tile == field.Mirror {
+			t.Fatalf("same-type overbuild on live mirror should be unavailable, got %+v", a)
+		}
+	}
+}
+
 func TestValidShiftActionsAllowsBuildOnBurnedOutSlot(t *testing.T) {
 	pos := hex.Coord{Q: 1, R: 1}
 	s := NewEmpty()
