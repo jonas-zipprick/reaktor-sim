@@ -3,6 +3,8 @@ package board
 import (
 	"math/rand"
 	"testing"
+
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 func TestPlayerCostsSplitByHalf(t *testing.T) {
@@ -23,7 +25,7 @@ func TestPlayerCostsSplitByHalf(t *testing.T) {
 }
 
 func TestRandomWithPlayerCostsEmptyHalf(t *testing.T) {
-	s, left, err := RandomWithPlayerCosts(rand.New(rand.NewSource(2)), 15, 0, 0)
+	s, left, err := RandomWithPlayerCosts(rand.New(rand.NewSource(2)), 15, 0, 0, rules.Month{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,14 +39,14 @@ func TestRandomWithPlayerCostsEmptyHalf(t *testing.T) {
 }
 
 func TestRandomWithPlayerCostsNegative(t *testing.T) {
-	_, _, err := RandomWithPlayerCosts(rand.New(rand.NewSource(1)), -1, 5, 0)
+	_, _, err := RandomWithPlayerCosts(rand.New(rand.NewSource(1)), -1, 5, 0, rules.Month{})
 	if err == nil {
 		t.Fatal("expected error for negative player1 cost")
 	}
 }
 
 func TestRandomWithPlayerCostsBothZero(t *testing.T) {
-	s, _, err := RandomWithPlayerCosts(rand.New(rand.NewSource(1)), 0, 0, 0)
+	s, _, err := RandomWithPlayerCosts(rand.New(rand.NewSource(1)), 0, 0, 0, rules.Month{})
 	if err != nil {
 		t.Fatal(err)
 	}

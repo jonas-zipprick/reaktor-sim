@@ -3,6 +3,8 @@ package board
 import (
 	"math/rand"
 	"testing"
+
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 func TestFingerprintRoundTrip(t *testing.T) {
@@ -19,7 +21,7 @@ func TestFingerprintRoundTrip(t *testing.T) {
 
 func TestFingerprintAfterShiftBudget(t *testing.T) {
 	prev := Random(rand.New(rand.NewSource(42)), 0)
-	if _, err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 5, 3, 0); err != nil {
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 5, 3, 0, rules.Month{}); err != nil {
 		t.Fatal(err)
 	}
 	got, err := FromFingerprint(Fingerprint(prev))

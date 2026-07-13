@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -65,6 +66,9 @@ func WriteBoardPNG(state *board.State, path string, view ChipView) error {
 
 func cellLabelLines(state *board.State, c hex.Coord, tile field.Tile, view ChipView) []string {
 	lines := []string{Label(state, c)}
+	if c.IsEmitter() && state.EmitterDamage > 0 {
+		lines = append(lines, fmt.Sprintf("!%d", state.EmitterDamage))
+	}
 	if bound := BottomLabel(state, c, tile); bound != "" {
 		lines = append(lines, bound)
 	}

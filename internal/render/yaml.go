@@ -48,16 +48,20 @@ type damageYAML struct {
 }
 
 type boardYAML struct {
-	Costs   costsYAML    `yaml:"costs"`
+	Seed      int64        `yaml:"seed,omitempty"`
+	PrevBoard string       `yaml:"prev_board,omitempty"`
+	Costs     costsYAML    `yaml:"costs"`
 	Demands []demandYAML `yaml:"demands"`
 	Damage  []damageYAML `yaml:"damage,omitempty"`
 	Cells   []cellYAML   `yaml:"cells"`
 	Legend  []string     `yaml:"legend"`
 }
 
-func buildBoardYAML(state *board.State) boardYAML {
+func buildBoardYAML(state *board.State, meta BoardMeta) boardYAML {
 	costs := state.PlayerCosts()
 	doc := boardYAML{
+		Seed:      meta.Seed,
+		PrevBoard: meta.PrevBoard,
 		Costs: costsYAML{
 			Reaktor:   costs.Player1,
 			Stromnetz: costs.Player2,
@@ -85,6 +89,13 @@ func buildBoardYAML(state *board.State) boardYAML {
 				Count:  n,
 			})
 		}
+	}
+	if n := state.EmitterDamage; n > 0 {
+		doc.Damage = append(doc.Damage, damageYAML{
+			Zone:   "Zünder",
+			Letter: "Z",
+			Count:  n,
+		})
 	}
 	for _, c := range hex.AllBoardCoords {
 		if !c.Valid() {

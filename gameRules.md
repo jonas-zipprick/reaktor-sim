@@ -22,8 +22,8 @@ Das Spiel ist **asymmetrisch**:
 * **Der Rahmen:** Das Spiel findet auf einem Hexagon-Raster statt (siehe "Das Spielfeld im Detail"). Links ist die Spielfeldhälfte für Spieler 1, rechts die Spielfeldhälfte für Spieler 2\. Um den Rand von der rechten Hälfte sind Zonen verteilt. Jede Zone hat Bedarfe und Schaden.
 * **Zeit-Slider:** Aufgeteilt in Schicht und Monat. So viele Schichten und Monate habt ihr bereits gespielt  
 * **Geldscheine**: Zum Merken wie viel Budget Spieler 1 und 2 diesen Monat noch zur Verfügung stehen  
-* **Der Ursprung (Reaktor-Emitter):** Am äußersten linken Rand liegt der Zünder. Hier startet in jeder Schicht (Runde) die Kettenreaktion.  
-* **Die Schnittstelle (Hauptturbine):** Genau in der Mitte des Rasters liegt die Turbine. Sie ist die Senke für den Reaktor und gleichzeitig der Startpunkt für das Stromnetz. Chips auf der Turbine zählen als ungebundene Spannungs-Chips des Spielers 2  
+* **Der Ursprung (Reaktor-Emitter):** Am äußersten linken Rand liegt der Zünder. Hier startet in jeder Schicht (Runde) die Kettenreaktion. Auch der Zünder kann Schaden sammeln.
+* **Die Schnittstelle (Hauptturbine):** Genau in der Mitte des Rasters liegt die Turbine. Sie ist die zusammen mit der sie berührenden Wand die Senke für den Reaktor und gleichzeitig der Startpunkt für das Stromnetz. Chips auf der Turbine zählen als ungebundene Spannungs-Chips des Spielers 2  
 * **Die Bürokratie:** Legt die zwei gemischten Kartenstapel (**Ministerium für Finanzen** und **Ministerium für Energiewirtschaft**) bereit. Energiekarten sind in 3 Level eingeteilt. Sortiert euren Stapel so dass zuerst die zwei Level 1 Karten, dann zwei Level 2 Karten und dann 3 Level 3 Karten kommen.  
 * **Richtungswürfel**: Wann immer euch die Regeln auffordern Chips in eine zufällige Richtung abzuschießen, würfelt. Die Zahl bestimmt die Kante. Tipp: Bei mehreren Chips, deren Richtung offen ist, könnt ihr gleich mehrere Würfel auf einmal würfeln (1 pro Chip), um schneller zu simulieren.
 
@@ -40,29 +40,29 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 **1\. Die Plan-Vorgabe:**
 
 * Die offene **Energie-Karte** gibt den genauen Schichtplan vor, den das Städtische Netz in diesem Monat verlangt, sowie technische Sonderregeln. Schaut auf den Schichtplan, verteilt Bedarfschips auf die Spielfeldränder der Seite des Spielers 2\.  
-* Die offene **Finanz-Karte** gibt an, wie viel **Geld** ihr beide zu Beginn *jeder einzelnen Schicht* dieses Monats erhaltet. (Gespartes Geld aus dem Monat davor verfällt). Nehmt euch die entsprechende Anzahl geldscheine für diesen Monat
+* Die offene **Finanz-Karte** gibt an, wie viel **Geld** ihr beide zu Beginn *jeder einzelnen Schicht* dieses Monats erhaltet. (Gespartes Geld aus dem Monat davor verfällt). Nehmt euch jetzt die entsprechende Anzahl Geldscheine für diese Schicht.
 
 **2\. Kaufen & Bauen (Start der Schicht):** Ihr kauft Felder aus dem Markt und legt sie in euer Raster. Schiebt die Geldschieber entsprechend der Kosten nach links. Sobald ein Feld gelegt wird, wird es mit Chips aus dem allgemeinen Vorrat als "Ladung" befüllt. Spieler 2 kann auch 1 Geld pro Schadenschip ausgeben um Schaden von Zonen zu entfernen.
-**3\. Zünden (Kostenlos):** Spieler 1 feuert am Zünder (am linken Rand) genau **1 Basis-Trigger** (Wärme-Chip oder Neutron) in eine gewählte Richtung ab. Spieler 2 feuert an der Turbine oder befriedigt direkt einen Bedarf im Kraftwerk  
+**3\. Zünden (Kostenlos):** Spieler 1 feuert am Zünder (am linken Rand) genau **1 Basis-Trigger** (Wärme-Chip oder Neutron) in eine gewählte Richtung ab. Spieler 2 feuert an der Turbine oder befriedigt direkt einen Bedarf im Kraftwerk. Das Feuern des Zünders ist optional.
 **4\. Simulation:** Trifft ein fliegender Chip auf ein Feld, passiert Folgendes:
 
 * *Flugbahn:*   
   * Chips fliegen in geraden Linien  
   * Spieler 1: Prallt ein Wärme-Chip gegen die feste Außenwand von Spieler 1 prallt er im gleichen Winkel ab. Andere Chips (Neutronen) verpuffen.  
-  * Spieler 2: Jeder Spannungs-Chip, der einen Rand trifft, verschwindet sofort und vernichtet dort einen Bedarfs-Chip. Ist kein Bedarfschip vorhanden, wird der Chip stattdessen auf das Schadensbereich der Zone gelegt. Chips auf den Schadensbereich zählen auch zum Limit von 8 für Spieler 2. Ihr müsst überschüssigen Strom zwingend durch Speicher-Felder, Erdungs-Felder oder andere Ränder vernichten, sonst droht durch die Reflektion sofort die Kritische Masse (\>8 Chips).  
+  * Spieler 2: Jeder Spannungs-Chip, der einen Rand trifft, verschwindet sofort und vernichtet dort einen Bedarfs-Chip. Ist kein Bedarfschip vorhanden, wird der Chip stattdessen auf das Schadensbereich der Zone gelegt. Chips auf den Schadensbereich zählen auch zum Limit von 7 für Spieler 2. Ihr müsst überschüssigen Strom zwingend durch Speicher-Felder, Erdungs-Felder oder andere Ränder vernichten, sonst droht durch die Reflektion sofort die Kritische Masse (\>7 Chips).  
 * *Reaktion:*   
   * *Treffer auf reguläres Feld*: Das Feld löst seinen Effekt aus (z.B. wird zerstört oder 1 Wärme wird zu 2 Wärme). Um das Lösen von Energie darzustellen, wird die richtige Anzahl Chips aus dem Bereich “gebunden” des Feldes in den Bereich “ungebunden” gelegt. Der eingehende Chip landet auch im Bereich “ungebunden”.  
   * *Treffer auf ausgebranntes Feld:* Der Chip verschwindet  
-  * *Treffer auf Zünder*: Der Chip wird vernichtet. 
+  * *Treffer auf Zünder*: Der Chip wird vernichtet. Der Zünder nimmt 1 Schaden.
   * *Treffer auf Turbine:*   
-    * Wärme-Chip: Wird zu einem ungebundenen Spannungs-Chip. Spieler 2 wählt wann und in welche richtung er die Spannungs-Chips abschießt. Sie zählen aber zum 8 Chip Limit und können deshalb nicht endlos aufgestaut werden.  
+    * Wärme-Chip: Wird zu einem ungebundenen Spannungs-Chip. Spieler 2 wählt wann und in welche richtung er die Spannungs-Chips abschießt. Sie zählen aber zum 7 Chip Limit und können deshalb nicht endlos aufgestaut werden. Auch die Wand die an der Turbine liegt konvertiert Wärme zu Spannung.
     * Spannungs-Chip: Zählt wie der Kraftwerk-Spielfeldrand. Verschwindet also und entfernt einen Bedarf.  
-* *Kritische Masse:* Existieren zu irgendeinem Zeitpunkt mehr als **8 *gelöste* Chips gleichzeitig** auf der linken Spielhälfte (Spieler 1\) *oder* mehr als 8 *gelöste* Chips auf der rechten Seite habt ihr beide verloren. Im Flug befindliche Chips zählen als gelöst.  
+* *Kritische Masse:* Existieren zu irgendeinem Zeitpunkt mehr als **7 *gelöste* Chips gleichzeitig** auf der linken Spielhälfte (Spieler 1\) *oder* mehr als 7 *gelöste* Chips auf der rechten Seite habt ihr beide verloren. Im Flug befindliche Chips zählen als gelöst. Alle Chips in Schadenszonen zählen auch zum Limit dazu. 
 * *Beliebige Reihenfolge:* Jeder Spieler darf in seiner Spielhälfte frei entscheiden, in welcher Reihenfolge Aktionen ausgespielt werden.  
 * *Quoten-Erfüllung & Überlastung:* Die Bedarfs-Chips die nicht befriedigt wurden, bleiben am Ende einer Schicht einfach liegen. In der nächsten Schicht kommen die neunen Bedarfschips vom Schichtplan einfach dazu. 
 
-**6\. Schichtabschluss**: Wurde während der Simulation der letzte Ladungs-Chip von einem Feld vom Bereich “gebunden” entfernt, wird das Feld jetzt abgeräumt.  
-**7\. Monatsabschluss:** Ist der Monat vorbei und es gibt keine Bedarfschips mehr auf den Rändern der Spielfeldhälfte des Spielers zwei, habt ihr den Monat überlebt. Legt das überschüssige Geld zurück. Deckt die nächste Finanz- und Energiekarten auf. Sind die Stapel leer (nach 6 erfolgreichen Monaten (einem Halbjahr)) gewinnt ihr das Spiel. Befinden sich noch Bedarfe auf dem Spielfeld habt ihr verloren.
+**6\. Schichtabschluss**: Wurde während der Simulation der letzte Ladungs-Chip von einem Feld vom Bereich “gebunden” entfernt, wird das Feld jetzt abgeräumt. Überschüssiges Gled gehört euch weiterhin bis zum Ende des Monats.
+**7\. Monatsabschluss:** Ist der Monat vorbei und es gibt keine Bedarfschips mehr auf den Rändern der Spielfeldhälfte des Spielers zwei, habt ihr den Monat überlebt. Legt das überschüssige Geld zurück (Selbst schuld wenn ihr euer Budget nicht aufbraucht harhar). Deckt die nächste Finanz- und Energiekarten auf. Sind die Stapel leer (nach 6 erfolgreichen Monaten (einem Halbjahr)) gewinnt ihr das Spiel. Befinden sich noch Bedarfe auf dem Spielfeld habt ihr verloren.
 
 ## **5\. Ministeriums-Karten**
 
@@ -77,26 +77,26 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
-| **Schicht 1** | 1 | 1 | 0 | **1** |
+| **Schicht 1** | 1 | 0 | 0 | **1** |
 | **Schicht 2** | 1 | 1 | 0 | **1** |
-| **Schicht 3** | 2 | 1 | 0 | **1** |
-| **Schicht 4** | 3 | 2 | 1 | **2** |
-| **Schicht 5** | 2 | 2 | 1 | **2** |
+| **Schicht 3** | 1 | 1 | 0 | **1** |
+| **Schicht 4** | 2 | 1 | 1 | **1** |
+| **Schicht 5** | 2 | 2 | 1 | **1** |
 
 *Kontext: Ein hochrangiger Parteifunktionär besucht die Anlage; die Sicherheitsprotokolle werden vorübergehend gelockert, um den guten Schein zu wahren.*
 
 #### **Optimierung des lokalen Netzes \- Stufe 1**
 
-**Sonderregel:** Transformatoren kosten 1 Geld statt 2 Geld  
+**Sonderregel:** Transformatoren kosten 1 Geld statt 3 Geld  
 **Schichtplan:**
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
 | **Schicht 1** | 0 | 1 | 0 | **1** |
-| **Schicht 2** | 0 | 2 | 0 | **1** |
-| **Schicht 3** | 1 | 2 | 0 | **1** |
-| **Schicht 4** | 1 | 2 | 1 | **1** |
-| **Schicht 5** | 1 | 2 | 1 | **2** |
+| **Schicht 2** | 0 | 1 | 0 | **1** |
+| **Schicht 3** | 0 | 2 | 0 | **1** |
+| **Schicht 4** | 1 | 2 | 0 | **1** |
+| **Schicht 5** | 1 | 2 | 1 | **1** |
 
 *Historischer Kontext: Um die Effizienz zu steigern, wurden in den 70ern oft lokale Netzverbesserungen vorgenommen, um die Verluste bei der Fernübertragung zu reduzieren. Diese Maßnahmen waren oft erfolgreich, schufen aber Abhängigkeiten bei der Leitungsführung.*
 
@@ -108,10 +108,10 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
-| **Schicht 1** | 2 | 2 | 0 | **1** |
-| **Schicht 2** | 3 | 1 | 0 | **1** |
-| **Schicht 3** | 2 | 2 | 1 | **1** |
-| **Schicht 4** | 3 | 1 | 0 | **1** |
+| **Schicht 1** | 1 | 1 | 0 | **1** |
+| **Schicht 2** | 2 | 1 | 0 | **1** |
+| **Schicht 3** | 1 | 1 | 1 | **1** |
+| **Schicht 4** | 2 | 1 | 0 | **1** |
 | **Schicht 5** | 2 | 1 | 1 | **1** |
 
 *Historischer Kontext: Das Ministerium drängt auf die Nutzung neuer, unerprobter Brennelemente, um die Kapazität zu erhöhen. Uran wird subventioniert*
@@ -123,10 +123,10 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
-| **Schicht 1** | 1 | 1 | 0 | **0** |
+| **Schicht 1** | 1 | 1 | 0 | **1** |
 | **Schicht 2** | 2 | 0 | 1 | **1** |
 | **Schicht 3** | 0 | 3 | 1 | **1** |
-| **Schicht 4** | 1 | 1 | 0 | **0** |
+| **Schicht 4** | 1 | 1 | 0 | **1** |
 | **Schicht 5** | 2 | 1 | 1 | **1** |
 
 *Historischer Kontext: Das Versorgungskomitee (Gossnab) maß seinen Erfolg oft in Tonnen. Kraftwerke erhielten daher regelmäßig Millionen Tonnen minderwertiger oder klatschnasser Kohle, da diese schwerer war und die Transportquote der Bahn erfüllte – auch wenn sie kaum brannte.*
@@ -139,8 +139,8 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
-| **Schicht 1** | 2 | 2 | 1 | **1** |
-| **Schicht 2** | 3 | 1 | 1 | **1** |
+| **Schicht 1** | 1 | 1 | 1 | **1** |
+| **Schicht 2** | 2 | 1 | 1 | **1** |
 | **Schicht 3** | 2 | 2 | 1 | **1** |
 | **Schicht 4** | 3 | 1 | 1 | **1** |
 | **Schicht 5** | 2 | 1 | 2 | **1** |
@@ -158,15 +158,15 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 | :---- | :---: | :---: | :---: | :---: |
 | **Schicht 1** | 1 | 1 | 1 | **1** |
 | **Schicht 2** | 2 | 2 | 1 | **1** |
-| **Schicht 3** | 4 | 2 | 2 | **2** |
-| **Schicht 4** | 6 | 1 | 2 | **2** |
-| **Schicht 5** | 7 | 2 | 1 | **2** |
+| **Schicht 3** | 3 | 2 | 2 | **2** |
+| **Schicht 4** | 4 | 1 | 2 | **2** |
+| **Schicht 5** | 4 | 2 | 1 | **2** |
 
 *Historischer Kontext: Da Material in der UdSSR oft erst spät im Monat geliefert wurde, standen Fabriken wochenlang still. In der letzten Woche brach die "Schturmowschtschina" aus – ein wahnsinniger, ungesicherter Produktionsrausch, um die Monatsquote noch irgendwie zu erfüllen.*
 
 ### **Um jeden Preis**
 
-Die "Kritische Masse" liegt in diesem Monat bei 10 statt 8 Chips (auf beiden Seiten). 
+Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Seiten). 
 
 ### **Ministerium für Finanzen (Das Budget)**
 
@@ -177,17 +177,18 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 8 Chips (auf beiden Sei
 
 **2\. "Nationale Sparmaßnahmen"**
 
-* **Schicht-Budget:** Reaktor: 1 Geld | Stromnetz: 2 Geld.  
+* **Schicht-Budget:** Reaktor: 2 Geld | Stromnetz: 2 Geld.  
 * **Sonderregel:** Keine. Ihr müsst mit dem Schrott arbeiten, den ihr habt.
 
 **3\. Nukleares Wettrüsten**
 
 * **Schicht-Budget:** Reaktor: 2 Geld | Stromnetz: 4 Geld.  
-* **Sonderregel:** Reparaturen werden nicht bewilligt. Leere (ausgebrannte) Felder dürfen in diesem Jahr nicht mit neuen Feldern überbaut werden.  
+* **Sonderregel:** Reparaturen von Schaden werden nicht bewilligt. Felder (auch ausgebrante) können weiterhin überbaut werden
 * *Historischer Kontext: In der Anlage Majak fiel 1957 das Kühlsystem für nukleare Abfälle aus. Da das Finanzbüro keine Reparaturmittel bewilligte (um die Produktion nicht zu stören), überhitzte ein Tank und löste den drittschwersten Nuklearunfall der Geschichte aus (Kyshtym-Vorfall).*
 
 ## **6\. Sektor 1: Der Reaktor (Felder für Spieler 1\)**
 
+* **Schaden reparieren (Kosten: 1):** Entferne 1 Schadens-Chip vom Zünder
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
 
 * **Ablenk-Spiegel (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Teilchen im fixen Winkel ab.  
@@ -203,14 +204,15 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 8 Chips (auf beiden Sei
 
 ## **7\. Sektor 2: Das Stromnetz (Felder für Spieler 2\)**
 
+* **Schaden reparieren (Kosten: 1):** Entferne 1 Schadens-Chip von einer der 4 Zonen
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
 
 * **Relais / Weiche (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Spannung im fixen Winkel ab.
 * **Erdung / Widerstand (Kosten: 1 Geld):** Leitet eintreffende Spannung ab (vernichtet sie). Wichtig bei Überproduktion\!  
-* **Transformator (Kosten: 2 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
-* **Notgenerator (Kosten: 3 Geld | Ladung: 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, die Ladung in eine gewünschte Richtung. Trifft ein Spannungs-Chip ein, wird der Generator sofort zerstört. Entferne ihn inklusive aller seiner ladungen sofort.  
+* **Transformator (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
+* **Notgenerator (Kosten: 3 Geld | Ladung: 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, eine Ladung in eine gewünschte Richtung. Ist der Generator ausgebrannt, so leitet er einkommende Spannungschips in zufällige Richtungen weiter.
 
-* **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 4 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum Limit von 8 Chips für die linke Spielhälfte.
+* **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 4 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum **Limit von 7 Chips** für die linke Spielhälfte.
 * **Blei-Akkumulator (Kosten: 3 Geld | Ladung: Maximal 2 Chip | ab 2\. Monat):** Wie Kondensator-Bank, aber verliert zu Begin der Schicht 1 Chip anstatt geleert zu werden. Bewege einen Chip auf ungebunden. Dieser Chip fliegt unkontrolliert in eine zufällige Richtung. Statt zu explodieren, werden einkommende Ladungschips in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  
 
 * **Pumpspeicherwerk (Kosten: 4 Geld | Ladung: Maximal 5 Chips | ab 3\. Monat):** Wie Kondensator-Bank, aber muss beim Schichtwechsel überhaupt nicht geleert werden. Statt zu explodieren, wird Spannung in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  

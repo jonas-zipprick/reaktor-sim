@@ -36,7 +36,10 @@ func drawDemandOutside(img *image.RGBA, state *board.State, ly layout, yOffset i
 }
 
 func drawZoneBadge(img *image.RGBA, center image.Point, letter string, demand, damage int) {
-	label := fmt.Sprintf("%s%d", letter, demand)
+	label := letter
+	if demand > 0 {
+		label += fmt.Sprintf("%d", demand)
+	}
 	if damage > 0 {
 		label += fmt.Sprintf(" !%d", damage)
 	}
@@ -135,6 +138,18 @@ func anchorBelow(ly layout, cells []hex.Coord) image.Point {
 	return image.Pt(sumX/n, maxY+demandOffset(1.15))
 }
 
+// drawEmitterDamageOutside renders igniter damage beside the emitter cell.
+func drawEmitterDamageOutside(img *image.RGBA, state *board.State, ly layout, yOffset int) {
+	if state.EmitterDamage <= 0 {
+		return
+	}
+	c := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
+	pos := ly.center(c)
+	pos.X -= demandOffset(1.25)
+	pos.Y += yOffset
+	drawZoneBadge(img, pos, "Z", 0, state.EmitterDamage)
+}
+
 // DemandSummaryLines returns remaining demand and damage per zone for text output.
 func DemandSummaryLines(state *board.State) []string {
 	lines := make([]string, 0, 8)
@@ -149,6 +164,9 @@ func DemandSummaryLines(state *board.State) []string {
 			line += fmt.Sprintf(", Schaden %d", d)
 		}
 		lines = append(lines, line)
+	}
+	if state.EmitterDamage > 0 {
+		lines = append(lines, fmt.Sprintf("Z Zünder: Schaden %d", state.EmitterDamage))
 	}
 	return lines
 }

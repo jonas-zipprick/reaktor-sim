@@ -72,6 +72,8 @@ Pro Seed wird ein Brett erzeugt (mit dem Schicht-Budget der Finanz-Karte) und `-
 | `-finanz-karte` | `schwerindustrie` | Finanz-Karte (Schicht-Budget) |
 | `-schichten` | 1 | Anzahl aufeinanderfolgender Schichten (1-5, ganzer Monat = 5) |
 | `-schicht-keep` | 1 | Top-Boards je Erfolgs-Rangliste, die in die nächste Schicht verzweigen |
+| `-month-filter` | 0 | Kampagnenmonat für Feldverfügbarkeit |
+| `-start-board` | — | Board-Fingerprint als Startbrett (Folgemonat) |
 | `-charts-dir` | `seedsearch-out` | Ausgabe für Chart-PNGs und `report.txt` |
 | `-out` | — | Vollständige Ergebnisse als YAML |
 | `-progress` | true | Fortschrittsbalken auf stderr |
@@ -85,6 +87,17 @@ go run ./cmd/seedsearch -from 1 -to 500 -runs 50 -schichten 5 -schicht-keep 2 -e
 ```
 
 `cmd/sim` behält dagegen die Einzel-Flags `-demand-*`, `-damage-*` und `-prev-board`.
+
+### Folgemonat mit festem Startbrett
+
+Mit `-start-board` lädt Schicht 1 ein bestehendes Brett per Fingerprint (z. B. aus `spielfeld-*.yaml` oder `carry_board_fingerprint` eines Seedsearch-Ergebnisses). Pro Seed werden nur noch Kaufvarianten mit dem Finanz-Budget ausprobiert; ab Schicht 2 verzweigt der Lauf wie gewohnt.
+
+```bash
+go run ./cmd/seedsearch -from 1 -to 500 -runs 100 \
+  -start-board b2_AQIIAAAAAwMABAAABAoAAwAABwkIAAAACgICAAAADQkCAAAAEAwAAQAAFAQAAAAA \
+  -energie-karte netzoptimierung -finanz-karte sparmassnahmen \
+  -schichten 5 -month-filter 2
+```
 
 ## Projektstruktur
 

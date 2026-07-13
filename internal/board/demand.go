@@ -18,7 +18,7 @@ type ShiftDemands struct {
 
 // DefaultShiftDemands matches Eröffnungsfeier Schicht 1 (see internal/energy).
 func DefaultShiftDemands() ShiftDemands {
-	return ShiftDemands{Industry: 1, Residential: 1, Rail: 0, Plant: 1}
+	return ShiftDemands{Industry: 1, Residential: 0, Rail: 0, Plant: 1}
 }
 
 var industryCells = []hex.Coord{{Q: 5, R: 0}, {Q: 6, R: 0}, {Q: 7, R: 0}}

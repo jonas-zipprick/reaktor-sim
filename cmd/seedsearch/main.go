@@ -33,6 +33,7 @@ func main() {
 	shifts := flag.Int("schichten", 1, "Anzahl aufeinanderfolgender Schichten (1-5, ganzer Monat = 5)")
 	shiftKeep := flag.Int("schicht-keep", 1, "Top-Boards je Rangliste, die in die naechste Schicht weiterverzweigt werden")
 	monthFilter := flag.Int("month-filter", 0, "Kampagnenmonat: nur dann verfuegbare Felder kaufen (0 = alle)")
+	startBoard := flag.String("start-board", "", "Board-Fingerprint als Startbrett (Folgemonat: Kaufvarianten statt Neugenerierung)")
 	flag.Parse()
 
 	if *to == 0 {
@@ -56,6 +57,11 @@ func main() {
 	if *monthFilter < 0 {
 		log.Fatal("-month-filter muss >= 0 sein")
 	}
+	if *startBoard != "" {
+		if _, err := board.FromFingerprint(*startBoard); err != nil {
+			log.Fatalf("start-board: %v", err)
+		}
+	}
 
 	energyCard, ok := energy.ByID(*energyID)
 	if !ok {
@@ -67,12 +73,13 @@ func main() {
 	}
 
 	opts := seedsearch.Options{
-		Runs:        *runs,
-		EnergyCard:  energyCard,
-		Finance:     financeCard,
-		Shifts:      *shifts,
-		ShiftKeep:   *shiftKeep,
-		MonthFilter: *monthFilter,
+		Runs:                  *runs,
+		EnergyCard:            energyCard,
+		Finance:               financeCard,
+		Shifts:                *shifts,
+		ShiftKeep:             *shiftKeep,
+		MonthFilter:           *monthFilter,
+		StartBoardFingerprint: *startBoard,
 	}
 
 	total := *to - *from + 1
@@ -82,7 +89,10 @@ func main() {
 	fmt.Fprintf(out, "Seed-Suche: Seeds %d–%d (%d Seeds), %d Laeufe je Seed\n", *from, *to, total, *runs)
 	fmt.Fprintf(out, "Energie-Karte: %s (Stufe %d)\n", energyCard.Name, energyCard.Level)
 	fmt.Fprintf(out, "Finanz-Karte: %s\n", financeCard.Describe())
-	fmt.Fprintf(out, "Schichten: %d (Sonderregeln werden nicht simuliert)\n", *shifts)
+	fmt.Fprintf(out, "Schichten: %d\n", *shifts)
+	if *startBoard != "" {
+		fmt.Fprintf(out, "Start-Board: %s (Schicht 1: Kaufvarianten je Seed)\n", *startBoard)
+	}
 	if *monthFilter > 0 {
 		fmt.Fprintf(out, "Monats-Filter: %d (nur ab diesem Monat verfuegbare Felder)\n", *monthFilter)
 	}
@@ -135,7 +145,7 @@ func main() {
 		if err := writeCharts(*chartsDir, scan, *runs); err != nil {
 			log.Fatal(err)
 		}
-		if err := writeTopSims(*chartsDir, scan, energyCard, *runs, *shiftKeep); err != nil {
+		if err := writeTopSims(*chartsDir, scan, energyCard, financeCard, *runs, *shiftKeep); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Fprintf(out, "Charts: %s/\n", *chartsDir)
@@ -353,6 +363,7 @@ type settingsYAML struct {
 	Shifts         int    `yaml:"shifts"`
 	ShiftKeep      int    `yaml:"shift_keep"`
 	MonthFilter    int    `yaml:"month_filter,omitempty"`
+	StartBoard     string `yaml:"start_board,omitempty"`
 }
 
 type shiftYAML struct {
@@ -423,6 +434,7 @@ func writeYAML(path string, scan seedsearch.ScanResult, opts seedsearch.Options,
 			Shifts:         opts.Shifts,
 			ShiftKeep:      opts.ShiftKeep,
 			MonthFilter:    opts.MonthFilter,
+			StartBoard:     opts.StartBoardFingerprint,
 		},
 	}
 	for _, sr := range scan.Shifts {

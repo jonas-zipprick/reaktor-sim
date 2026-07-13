@@ -57,28 +57,103 @@ func writeCostChart(report stats.Report, path string) error {
 	p.X.Label.Text = ""
 
 	c := report.Costs
-	values := plotter.Values{float64(c.Player1), float64(c.Player2)}
-	bar, err := plotter.NewBarChart(values, vg.Points(40))
+	fieldVals := plotter.Values{float64(c.Player1), float64(c.Player2)}
+	var rebuildVals plotter.Values
+	if report.Campaign != nil {
+		rebuildVals = plotter.Values{report.Campaign.RebuildF[0], report.Campaign.RebuildF[1]}
+	}
+	repairVals := plotter.Values{report.AvgRepairF[0], report.AvgRepairF[1]}
+	savedVals := plotter.Values{report.AvgSavedF[0], report.AvgSavedF[1]}
+
+	fieldBar, err := plotter.NewBarChart(fieldVals, vg.Points(40))
 	if err != nil {
 		return err
 	}
-	bar.Color = color.RGBA{R: 70, G: 130, B: 180, A: 255}
-	p.Add(bar)
+	fieldBar.Color = color.RGBA{R: 70, G: 130, B: 180, A: 255}
+	fieldBar.LineStyle.Width = 0
+
+	var rebuildBar *plotter.BarChart
+	if report.Campaign != nil {
+		rebuildBar, err = plotter.NewBarChart(rebuildVals, vg.Points(40))
+		if err != nil {
+			return err
+		}
+		rebuildBar.Color = color.RGBA{R: 160, G: 110, B: 70, A: 255}
+		rebuildBar.LineStyle.Width = 0
+		rebuildBar.StackOn(fieldBar)
+	}
+
+	repairBar, err := plotter.NewBarChart(repairVals, vg.Points(40))
+	if err != nil {
+		return err
+	}
+	repairBar.Color = color.RGBA{R: 220, G: 140, B: 60, A: 255}
+	repairBar.LineStyle.Width = 0
+	if rebuildBar != nil {
+		repairBar.StackOn(rebuildBar)
+	} else {
+		repairBar.StackOn(fieldBar)
+	}
+
+	savedBar, err := plotter.NewBarChart(savedVals, vg.Points(40))
+	if err != nil {
+		return err
+	}
+	savedBar.Color = color.RGBA{R: 90, G: 170, B: 90, A: 255}
+	savedBar.LineStyle.Width = 0
+	savedBar.StackOn(repairBar)
+
+	if rebuildBar != nil {
+		p.Add(fieldBar, rebuildBar, repairBar, savedBar)
+		p.Legend.Add("Feldkosten (Brett)", fieldBar)
+		p.Legend.Add("Umbau", rebuildBar)
+	} else {
+		p.Add(fieldBar, repairBar, savedBar)
+		p.Legend.Add("Feldkosten", fieldBar)
+	}
+	p.Legend.Add("Reparatur", repairBar)
+	p.Legend.Add("Gespart", savedBar)
+	p.Legend.Top = true
 	p.NominalX("Spieler 1\n(Reaktor)", "Spieler 2\n(Stromnetz)")
 
-	maxCost := c.Player1
-	if c.Player2 > maxCost {
-		maxCost = c.Player2
+	maxCost := playerStackTotal(c.Player1, 0, report.Campaign, report.AvgRepairF[0], report.AvgSavedF[0])
+	if total := playerStackTotal(c.Player2, 1, report.Campaign, report.AvgRepairF[1], report.AvgSavedF[1]); total > maxCost {
+		maxCost = total
 	}
-	p.Y.Max = float64(maxCost) * 1.2
+	if report.Campaign != nil {
+		if report.Campaign.MonthBudget[0] > maxCost {
+			maxCost = report.Campaign.MonthBudget[0]
+		}
+		if report.Campaign.MonthBudget[1] > maxCost {
+			maxCost = report.Campaign.MonthBudget[1]
+		}
+	}
+	p.Y.Max = float64(maxCost) * 1.15
 	if p.Y.Max < 5 {
 		p.Y.Max = 5
 	}
 
 	sub := fmt.Sprintf("%d Simulationen | Kritische Masse: %.1f%%", report.Runs, report.CriticalFailRate*100)
-	p.Title.Text = fmt.Sprintf("Kosten: %s (%s)", c.String(), sub)
+	if report.Campaign != nil && report.Campaign.Shifts > 1 {
+		p.Title.Text = fmt.Sprintf("Monatsbudget %d/%d Geld (%d Schichten) | Reaktor %d+%.0f+%.1f+%.1f | Stromnetz %d+%.0f+%.1f+%.1f (%s)",
+			report.Campaign.MonthBudget[0], report.Campaign.MonthBudget[1], report.Campaign.Shifts,
+			c.Player1, report.Campaign.RebuildF[0], report.AvgRepairF[0], report.AvgSavedF[0],
+			c.Player2, report.Campaign.RebuildF[1], report.AvgRepairF[1], report.AvgSavedF[1], sub)
+	} else {
+		p.Title.Text = fmt.Sprintf("Kosten: Reaktor %d+%.1f+%.1f | Stromnetz %d+%.1f+%.1f (%s)",
+			c.Player1, report.AvgRepairF[0], report.AvgSavedF[0],
+			c.Player2, report.AvgRepairF[1], report.AvgSavedF[1], sub)
+	}
 
 	return p.Save(6*vg.Inch, 4*vg.Inch, path)
+}
+
+func playerStackTotal(field, player int, campaign *stats.CampaignMoney, repair, saved float64) int {
+	total := field + int(repair+0.5) + int(saved+0.5)
+	if campaign != nil {
+		total += int(campaign.RebuildF[player] + 0.5)
+	}
+	return total
 }
 
 func writeHistogram(h stats.Histogram, title, xLabel, path string) error {

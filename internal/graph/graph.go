@@ -238,11 +238,8 @@ func forwardOrReflect(c hex.Coord, incomingDir int, heat, neutron, voltage float
 	switch hex.BlockedBoundary(c, next, incomingDir) {
 	case hex.BoundaryInternalWall:
 		if heat > 0 {
-			refDir := hex.ReflectOffOuterWall(incomingDir)
-			refNext := c.Neighbor(refDir)
-			if hex.CanEnter(c, refNext) {
-				return []rawOut{{to: refNext, heat: heat, neutron: neutron, voltage: voltage}}
-			}
+			turbine := hex.Coord{Q: hex.TurbineCol, R: hex.TurbineRow}
+			return []rawOut{{to: turbine, voltage: heat}}
 		}
 		return nil
 	case hex.BoundaryOuter:

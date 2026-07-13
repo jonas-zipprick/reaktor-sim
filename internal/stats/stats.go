@@ -14,6 +14,9 @@ type Histogram map[int]float64
 // Report contains all balance metrics for one board state.
 type Report struct {
 	Costs            board.PlayerCosts
+	AvgRepairF       [2]float64 // [0]=P1 reactor repair, [1]=P2 grid repair (mean per MC run)
+	AvgSavedF        [2]float64 // [0]=P1 unspent after repair, [1]=P2 (mean per MC run)
+	Campaign         *CampaignMoney // optional multi-shift month accounting (seedsearch)
 	Runs             int
 	HeatAtTurbine    Histogram
 	ZoneHistograms   map[board.Zone]Histogram
@@ -23,7 +26,8 @@ type Report struct {
 }
 
 // Build aggregates simulation results into histograms.
-func Build(costs board.PlayerCosts, results []sim.Result) Report {
+// leftover is the unspent shift budget after board purchases (before repair).
+func Build(costs board.PlayerCosts, leftover board.PlayerLeftover, results []sim.Result) Report {
 	runs := len(results)
 	if runs == 0 {
 		return Report{Costs: costs, ZoneHistograms: make(map[board.Zone]Histogram)}
@@ -37,8 +41,11 @@ func Build(costs board.PlayerCosts, results []sim.Result) Report {
 	critical := 0
 	criticalP1 := 0
 	criticalP2 := 0
+	var repairP1, repairP2 float64
 
 	for _, r := range results {
+		repairP1 += float64(r.ReactorRepairSpent)
+		repairP2 += float64(r.RepairSpent)
 		heatCounts[r.HeatAtTurbine]++
 		for z := board.Zone(0); int(z) < 4; z++ {
 			zoneCounts[z][r.ZoneDeliveries[z]]++
@@ -54,8 +61,20 @@ func Build(costs board.PlayerCosts, results []sim.Result) Report {
 		}
 	}
 
+	avgRepairP1 := repairP1 / float64(runs)
+	avgRepairP2 := repairP2 / float64(runs)
+	avgSavedP1 := float64(leftover.Player1) - avgRepairP1
+	avgSavedP2 := float64(leftover.Player2) - avgRepairP2
+	if avgSavedP1 < 0 {
+		avgSavedP1 = 0
+	}
+	if avgSavedP2 < 0 {
+		avgSavedP2 = 0
+	}
 	report := Report{
 		Costs:            costs,
+		AvgRepairF:       [2]float64{avgRepairP1, avgRepairP2},
+		AvgSavedF:        [2]float64{avgSavedP1, avgSavedP2},
 		Runs:             runs,
 		HeatAtTurbine:    normalize(heatCounts, runs),
 		ZoneHistograms:   make(map[board.Zone]Histogram, 4),

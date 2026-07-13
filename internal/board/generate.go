@@ -7,6 +7,7 @@ import (
 
 	"github.com/jonas/reaktor-sim/internal/field"
 	"github.com/jonas/reaktor-sim/internal/hex"
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 // ErrCostNotAchievable means no placement sums to the requested cost.
@@ -43,16 +44,20 @@ func randomWithPlayerCostsExact(rng *rand.Rand, player1, player2, monthFilter in
 	}
 
 	s := NewEmpty()
-	if err := fillSlotCosts(rng, s, slotsForPlayer(true), player1, "Spieler 1 (Reaktor)", monthFilter); err != nil {
+	if err := fillSlotCosts(rng, s, slotsForPlayer(true), player1, "Spieler 1 (Reaktor)", monthFilter, rules.Month{}); err != nil {
 		return nil, err
 	}
-	if err := fillSlotCosts(rng, s, slotsForPlayer(false), player2, "Spieler 2 (Stromnetz)", monthFilter); err != nil {
+	if err := fillSlotCosts(rng, s, slotsForPlayer(false), player2, "Spieler 2 (Stromnetz)", monthFilter, rules.Month{}); err != nil {
 		return nil, err
 	}
 	return s, nil
 }
 
 const removeFieldBudgetCost = 1
+
+// burnedRefreshWeight is how much more likely a same-type rebuild on a burned-out
+// slot is compared to other affordable shift actions.
+const burnedRefreshWeight = 3
 
 type shiftAction struct {
 	kind  string
@@ -61,7 +66,7 @@ type shiftAction struct {
 	cost  int
 }
 
-func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget int) []shiftAction {
+func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget int, month rules.Month) []shiftAction {
 	var actions []shiftAction
 	if budget >= removeFieldBudgetCost {
 		for _, c := range slots {
@@ -78,7 +83,7 @@ func validShiftActions(s *State, slots []hex.Coord, market []field.Type, budget 
 	for _, c := range slots {
 		vacant := slotIsVacant(c, s)
 		for _, tileType := range market {
-			cost := fieldCost(tileType)
+			cost := month.FieldCost(tileType)
 			if cost > budget {
 				continue
 			}
@@ -107,13 +112,48 @@ func slotIsVacant(c hex.Coord, s *State) bool {
 	return t.Type == field.Empty || t.BurnedOut
 }
 
-func applyShiftAction(s *State, act shiftAction, rng *rand.Rand) {
+func applyShiftAction(s *State, act shiftAction, rng *rand.Rand, month rules.Month) {
 	switch act.kind {
 	case "remove":
 		s.Tiles[act.coord.Q][act.coord.R] = field.Tile{Type: field.Empty}
 	default:
-		placeTile(s, act.coord, act.tile, rng)
+		placeTile(s, act.coord, act.tile, rng, month)
 	}
+}
+
+func pickShiftAction(rng *rand.Rand, actions []shiftAction, s *State) shiftAction {
+	if len(actions) == 1 {
+		return actions[0]
+	}
+	total := 0
+	weights := make([]int, len(actions))
+	for i, act := range actions {
+		w := 1
+		if isBurnedSameTypeRefresh(s, act) {
+			w = burnedRefreshWeight
+		}
+		weights[i] = w
+		total += w
+	}
+	r := rng.Intn(total)
+	for i, w := range weights {
+		r -= w
+		if r < 0 {
+			return actions[i]
+		}
+	}
+	return actions[len(actions)-1]
+}
+
+func isBurnedSameTypeRefresh(s *State, act shiftAction) bool {
+	if act.kind == "remove" {
+		return false
+	}
+	t := s.tileAt(act.coord)
+	if t == nil || !t.BurnedOut {
+		return false
+	}
+	return act.tile == t.Type
 }
 
 func slotsForPlayer(player1 bool) []hex.Coord {
@@ -126,11 +166,11 @@ func slotsForPlayer(player1 bool) []hex.Coord {
 	return out
 }
 
-func fillSlotCosts(rng *rand.Rand, s *State, slots []hex.Coord, target int, label string, monthFilter int) error {
+func fillSlotCosts(rng *rand.Rand, s *State, slots []hex.Coord, target int, label string, monthFilter int, month rules.Month) error {
 	if target == 0 {
 		return nil
 	}
-	planner, err := newCostPlanner(slots, monthFilter)
+	planner, err := newCostPlanner(slots, monthFilter, month)
 	if err != nil {
 		return err
 	}
@@ -148,8 +188,8 @@ func fillSlotCosts(rng *rand.Rand, s *State, slots []hex.Coord, target int, labe
 			choices[i], choices[j] = choices[j], choices[i]
 		})
 		t := choices[0]
-		placeTile(s, c, t, rng)
-		remaining -= fieldCost(t)
+		placeTile(s, c, t, rng, month)
+		remaining -= month.FieldCost(t)
 	}
 	if remaining != 0 {
 		return fmt.Errorf("%w: %s %d Geld (erreichbar: %d-%d)", ErrCostNotAchievable, label, target, planner.minCost, planner.maxCost)
@@ -163,7 +203,7 @@ func randomWithCostOnSlots(rng *rand.Rand, target int) (*State, error) {
 		return NewEmpty(), nil
 	}
 	s := NewEmpty()
-	if err := fillSlotCosts(rng, s, PlaceableSlots(), target, "gesamt", 0); err != nil {
+	if err := fillSlotCosts(rng, s, PlaceableSlots(), target, "gesamt", 0, rules.Month{}); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -176,15 +216,17 @@ type costPlanner struct {
 	achievable map[int]bool
 	minCost    int
 	maxCost    int
+	month      rules.Month
 }
 
-func newCostPlanner(slots []hex.Coord, monthFilter int) (*costPlanner, error) {
+func newCostPlanner(slots []hex.Coord, monthFilter int, month rules.Month) (*costPlanner, error) {
 	n := len(slots)
 	p := &costPlanner{
 		slots:      slots,
 		slotTypes:  make([][]field.Type, n),
 		achievable: map[int]bool{0: true},
 		minCost:    0,
+		month:      month,
 	}
 	for i, c := range slots {
 		types := make([]field.Type, 0, len(marketFor(c, monthFilter))+1)
@@ -193,7 +235,7 @@ func newCostPlanner(slots []hex.Coord, monthFilter int) (*costPlanner, error) {
 		p.slotTypes[i] = types
 		slotMax := 0
 		for _, t := range types {
-			if cost := fieldCost(t); cost > slotMax {
+			if cost := month.FieldCost(t); cost > slotMax {
 				slotMax = cost
 			}
 		}
@@ -202,7 +244,7 @@ func newCostPlanner(slots []hex.Coord, monthFilter int) (*costPlanner, error) {
 
 	reach := map[int]bool{0: true}
 	for i := 0; i < n; i++ {
-		costs := costsForTypes(p.slotTypes[i])
+		costs := costsForTypes(p.slotTypes[i], p.month)
 		next := make(map[int]bool, len(reach)*len(costs))
 		for sum := range reach {
 			for _, cost := range costs {
@@ -218,7 +260,7 @@ func newCostPlanner(slots []hex.Coord, monthFilter int) (*costPlanner, error) {
 	p.suffix[n][0] = true
 	for i := n - 1; i >= 0; i-- {
 		p.suffix[i] = make([]bool, p.maxCost+1)
-		costs := costsForTypes(p.slotTypes[i])
+		costs := costsForTypes(p.slotTypes[i], p.month)
 		for sum := 0; sum <= p.maxCost; sum++ {
 			for _, cost := range costs {
 				if sum >= cost && p.suffix[i+1][sum-cost] {
@@ -237,7 +279,7 @@ func (p *costPlanner) validChoices(slotIdx, remaining int) []field.Type {
 	}
 	out := make([]field.Type, 0, len(p.slotTypes[slotIdx]))
 	for _, t := range p.slotTypes[slotIdx] {
-		cost := fieldCost(t)
+		cost := p.month.FieldCost(t)
 		if cost > remaining {
 			continue
 		}
@@ -266,15 +308,15 @@ func fieldCost(t field.Type) int {
 	return field.Catalog[t].Cost
 }
 
-func costsForTypes(types []field.Type) []int {
+func costsForTypes(types []field.Type, month rules.Month) []int {
 	costs := make([]int, len(types))
 	for i, t := range types {
-		costs[i] = fieldCost(t)
+		costs[i] = month.FieldCost(t)
 	}
 	return costs
 }
 
-func placeTile(s *State, c hex.Coord, t field.Type, rng *rand.Rand) {
+func placeTile(s *State, c hex.Coord, t field.Type, rng *rand.Rand, month rules.Month) {
 	if t == field.Empty {
 		s.Tiles[c.Q][c.R] = field.Tile{Type: field.Empty}
 		return
@@ -288,4 +330,7 @@ func placeTile(s *State, c hex.Coord, t field.Type, rng *rand.Rand) {
 		orient = hex.RandomRotation(rng)
 	}
 	s.Tiles[c.Q][c.R] = field.NewTile(t, orient, superTarget)
+	if info, ok := field.Catalog[t]; ok && info.InitialCharge >= 0 {
+		s.Tiles[c.Q][c.R].Charge = month.InitialCharge(t)
+	}
 }

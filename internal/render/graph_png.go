@@ -31,6 +31,7 @@ func WriteGraphPNG(state *board.State, g *graph.Graph, path string, caption stri
 	legendLines := []string{
 		legend1, legend2, legend3, legend4,
 		"Rand-Bedarf ausserhalb des Feldes: I/W/b/R + Zahl (!n = Schaden)",
+		"Zuender-Schaden links am Raster (!n)",
 		fmt.Sprintf("%d Knoten, Kanten mit P >= %.0f%%", len(g.Nodes), minEdgeProb*100),
 	}
 	for _, leg := range legendLines {
@@ -102,6 +103,7 @@ func WriteGraphPNG(state *board.State, g *graph.Graph, path string, caption stri
 	}
 
 	drawDemandOutside(img, state, ly, captionOffset)
+	drawEmitterDamageOutside(img, state, ly, captionOffset)
 
 	legendY := ly.gridHeight + 10 + captionOffset
 	drawLabelLeft(img, image.Pt(10, legendY), legend1, colText)

@@ -9,7 +9,7 @@ import (
 func TestBuildBoardYAMLCosts(t *testing.T) {
 	s := board.NewEmpty()
 	s.ApplyDemands(board.ShiftDemands{Plant: 1})
-	doc := buildBoardYAML(s)
+	doc := buildBoardYAML(s, BoardMeta{})
 	if doc.Costs.Total != 0 {
 		t.Fatalf("costs = %+v", doc.Costs)
 	}

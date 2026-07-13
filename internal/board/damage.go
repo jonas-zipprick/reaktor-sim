@@ -50,6 +50,11 @@ func ZoneFromBorderDamageEvent(event string) (Zone, bool) {
 	return 0, false
 }
 
+// TotalBoardDamage returns all damage chips on the board (zones + igniter).
+func (s *State) TotalBoardDamage() int {
+	return s.TotalPlayer2Damage() + s.EmitterDamage
+}
+
 // TotalPlayer2Damage sums damage chips across all player-2 zones.
 func (s *State) TotalPlayer2Damage() int {
 	total := 0
@@ -60,6 +65,36 @@ func (s *State) TotalPlayer2Damage() int {
 }
 
 const repairCostPerChip = 1
+
+// AddEmitterDamage adds one damage chip to the igniter.
+func (s *State) AddEmitterDamage() {
+	s.EmitterDamage++
+}
+
+// ReactorRepairBudget returns how much leftover reactor money can be spent on
+// igniter repairs (1 money per damage chip).
+func ReactorRepairBudget(leftoverP1 int, s *State) int {
+	if leftoverP1 <= 0 {
+		return 0
+	}
+	if leftoverP1 > s.EmitterDamage {
+		return s.EmitterDamage
+	}
+	return leftoverP1
+}
+
+// RepairEmitterDamage removes igniter damage at 1 money per chip until budget
+// or damage runs out. Returns money spent.
+func (s *State) RepairEmitterDamage(budget int) int {
+	if budget <= 0 || s.EmitterDamage <= 0 {
+		return 0
+	}
+	if budget > s.EmitterDamage {
+		budget = s.EmitterDamage
+	}
+	s.EmitterDamage -= budget
+	return budget
+}
 
 // GridRepairBudget returns how much leftover grid money can be spent on repairs
 // (1 money per damage chip) until money or damage runs out.

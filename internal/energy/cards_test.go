@@ -10,8 +10,8 @@ import (
 func TestDefaultCardShift1NotAllOnes(t *testing.T) {
 	c := energy.DefaultCard()
 	d := c.ShiftDemands(1)
-	if d.Industry != 1 || d.Residential != 1 || d.Rail != 0 || d.Plant != 1 {
-		t.Fatalf("eroeffnungsfeier shift 1 = %+v, want I1 W1 b0 R1", d)
+	if d.Industry != 1 || d.Residential != 0 || d.Rail != 0 || d.Plant != 1 {
+		t.Fatalf("eroeffnungsfeier shift 1 = %+v, want I1 W0 b0 R1", d)
 	}
 }
 
@@ -29,8 +29,8 @@ func TestNetzoptimierungShift1(t *testing.T) {
 func TestEroeffnungsfeierShift3(t *testing.T) {
 	c := energy.DefaultCard()
 	d := c.ShiftDemands(3)
-	if d.Industry != 2 || d.Residential != 1 || d.Rail != 0 || d.Plant != 1 {
-		t.Fatalf("eroeffnungsfeier shift 3 = %+v, want I2 W1 b0 R1", d)
+	if d.Industry != 1 || d.Residential != 1 || d.Rail != 0 || d.Plant != 1 {
+		t.Fatalf("eroeffnungsfeier shift 3 = %+v, want I1 W1 b0 R1", d)
 	}
 }
 
@@ -40,7 +40,7 @@ func TestSchturmowShift5HighDemand(t *testing.T) {
 		t.Fatal("card not found")
 	}
 	d := c.ShiftDemands(5)
-	if d.Industry != 7 || d.Plant != 2 {
+	if d.Industry != 4 || d.Plant != 2 {
 		t.Fatalf("shift 5 = %+v", d)
 	}
 }

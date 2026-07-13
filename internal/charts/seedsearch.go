@@ -29,10 +29,24 @@ func WriteSeedsearchCharts(outDir string, outcomes []seedsearch.Outcome, runs in
 			xLabel:   "Schaden gesamt",
 			bucket:   func(o seedsearch.Outcome) int { return o.TotalMedianEndDamage() },
 		},
+		{
+			title:    "Verteilung Winrate je Seed (alle Bedarfe, max. 1 Schaden)",
+			filename: "verteilung_winrate_all_demands_max1_damage.png",
+			xLabel:   "Winrate (%)",
+			bucket: func(o seedsearch.Outcome) int {
+				return int(math.Round(o.AllDemandsMax1DamageRate() * 100))
+			},
+		},
 	}
 	for _, m := range allSeedMetrics {
-		h := outcomeHistogram(outcomes, m.bucket)
-		title := fmt.Sprintf("%s (%d Seeds, %d Laeufe je Seed)", m.title, len(outcomes), runs)
+		chartOutcomes := outcomes
+		titleSuffix := fmt.Sprintf("%d Seeds", len(outcomes))
+		if m.filename == "verteilung_winrate_all_demands_max1_damage.png" {
+			chartOutcomes = OutcomesWithPositiveWinrate(outcomes)
+			titleSuffix = fmt.Sprintf("%d Seeds (ohne 0%% Winrate)", len(chartOutcomes))
+		}
+		h := outcomeHistogram(chartOutcomes, m.bucket)
+		title := fmt.Sprintf("%s (%s, %d Laeufe je Seed)", m.title, titleSuffix, runs)
 		path := filepath.Join(outDir, m.filename)
 		if err := writeHistogram(h, title, m.xLabel, path); err != nil {
 			return fmt.Errorf("%s: %w", m.filename, err)
@@ -137,4 +151,14 @@ func outcomeHistogram(outcomes []seedsearch.Outcome, bucket func(seedsearch.Outc
 		h[k] = float64(v) / float64(total)
 	}
 	return h
+}
+
+func OutcomesWithPositiveWinrate(outcomes []seedsearch.Outcome) []seedsearch.Outcome {
+	out := make([]seedsearch.Outcome, 0, len(outcomes))
+	for _, o := range outcomes {
+		if o.AllDemandsMax1Damage > 0 {
+			out = append(out, o)
+		}
+	}
+	return out
 }

@@ -38,9 +38,9 @@ func narrate(event string, resolved *Chip, b *board.State, queue []Chip, emitted
 		return narrateWithoutChip(event, b, queue)
 	case "Zuender-Treffer":
 		if resolved != nil {
-			return fmt.Sprintf("%s trifft den Zünder und wird vernichtet.", chipName(resolved.Type))
+			return fmt.Sprintf("%s trifft den Zünder und wird vernichtet. Der Zünder nimmt 1 Schaden.", chipName(resolved.Type))
 		}
-		return "Ein Chip trifft den Zünder und wird vernichtet."
+		return "Ein Chip trifft den Zünder und wird vernichtet. Der Zünder nimmt 1 Schaden."
 	case "Freiwilliger Schuss":
 		return narrateWithoutChip(event, b, queue)
 	}
@@ -147,8 +147,8 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip, emit
 	tile := b.Tiles[target.Q][target.R]
 
 	switch event {
-	case "Feldreaktion", "Notgenerator zerstoert":
-		return narrateFieldHit(chip, target, tile, queue, emitted, event == "Notgenerator zerstoert")
+	case "Feldreaktion":
+		return narrateFieldHit(chip, target, tile, queue, emitted)
 	case "Kondensator explodiert":
 		if len(emitted) > 0 {
 			return fmt.Sprintf("Kondensator-Bank explodiert — %s", formatDirRolls(emitted))
@@ -157,6 +157,15 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip, emit
 	case "Turbine":
 		emitted := emittedAt(queue, target)
 		if chip.Type == ChipHeat {
+			if isReactorWallHeatApproach(chip) {
+				if len(emitted) > 0 {
+					return fmt.Sprintf(
+						"Wärme trifft die Reaktorwand und erzeugt an der Turbine Spannung in Richtung %s.",
+						dirName(emitted[0].Dir),
+					)
+				}
+				return "Wärme trifft die Reaktorwand und erzeugt an der Turbine Spannung."
+			}
 			if len(emitted) > 0 {
 				return fmt.Sprintf("Wärme trifft die Turbine. Die Turbine erzeugt Spannung in Richtung %s.", dirName(emitted[0].Dir))
 			}
@@ -189,16 +198,12 @@ func narrateResolved(event string, chip Chip, b *board.State, queue []Chip, emit
 	return ""
 }
 
-func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip, emitted []Chip, destroyed bool) string {
+func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip, emitted []Chip) string {
 	name := fieldShortName(tile.Type)
 	incoming := chipName(chip.Type)
 	released := emitted
 	if len(released) == 0 {
 		released = emittedAt(queue, target)
-	}
-
-	if destroyed {
-		return fmt.Sprintf("%s trifft den Notgenerator — er wird sofort zerstört.", incoming)
 	}
 
 	switch tile.Type {
@@ -492,4 +497,12 @@ func fieldVon(t field.Type) string {
 		}
 		return "Speicher"
 	}
+}
+
+func isReactorWallHeatApproach(chip Chip) bool {
+	if chip.Type != ChipHeat {
+		return false
+	}
+	next := chip.Pos.Neighbor(chip.Dir)
+	return hex.BlockedBoundary(chip.Pos, next, chip.Dir) == hex.BoundaryInternalWall
 }

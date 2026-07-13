@@ -3,6 +3,8 @@ package board
 import (
 	"math/rand"
 	"testing"
+
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 func TestPlaceableSlots(t *testing.T) {
@@ -65,7 +67,7 @@ func TestRandomWithCostNegative(t *testing.T) {
 
 func TestAllCostsAchievableUpToMax(t *testing.T) {
 	slots := PlaceableSlots()
-	planner, err := newCostPlanner(slots, 0)
+	planner, err := newCostPlanner(slots, 0, rules.Month{})
 	if err != nil {
 		t.Fatal(err)
 	}

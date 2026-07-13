@@ -75,47 +75,46 @@ func TestVoltageDeliveryConsumesDemand(t *testing.T) {
 	}
 }
 
-func TestHeatReflectsOffInternalWall(t *testing.T) {
+func TestHeatAtInternalWallConvertsAtTurbine(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
 		Pos:  hex.Coord{Q: 4, R: 0},
-		Dir:  0, // east into internal wall
+		Dir:  0, // east into reactor wall above turbine
 	}}
 
 	rng := rand.New(rand.NewSource(4))
-	_, snaps := sim.RunTrace(board.NewEmpty(), rng, cfg)
+	res, snaps := sim.RunTrace(board.NewEmpty(), rng, cfg)
+	if res.HeatAtTurbine != 1 {
+		t.Fatalf("HeatAtTurbine = %d, want 1", res.HeatAtTurbine)
+	}
 	for _, snap := range snaps {
-		if snap.Event != "Waerme-Reflektion" {
+		if snap.Event == "Waerme-Reflektion" {
+			t.Fatalf("heat at reactor wall must not reflect, got %q", snap.Narrative)
+		}
+		if snap.Event != "Turbine" {
 			continue
 		}
-		if !strings.Contains(snap.Narrative, "Richtung W") {
-			t.Fatalf("east into internal wall should reflect west, got %q", snap.Narrative)
+		if !strings.Contains(snap.Narrative, "Reaktorwand") {
+			t.Fatalf("expected reactor wall narrative, got %q", snap.Narrative)
 		}
 		return
 	}
-	t.Fatal("expected heat reflection at internal wall")
+	t.Fatal("expected turbine conversion at reactor wall")
 }
 
-func TestHeatReflectsOffInternalWallFromPlayer2(t *testing.T) {
+func TestHeatAtLowerInternalWallConvertsAtTurbine(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 5, R: 2},
-		Dir:  hex.RotW.TravelDir(),
+		Pos:  hex.Coord{Q: 4, R: 2},
+		Dir:  0,
 	}}
 
-	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
-	for _, snap := range snaps {
-		if snap.Event != "Waerme-Reflektion" {
-			continue
-		}
-		if !strings.Contains(snap.Narrative, "Richtung E") {
-			t.Fatalf("west into internal wall should reflect east, got %q", snap.Narrative)
-		}
-		return
+	res := sim.Run(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+	if res.HeatAtTurbine != 1 {
+		t.Fatalf("HeatAtTurbine = %d, want 1", res.HeatAtTurbine)
 	}
-	t.Fatal("expected heat reflection from player 2 side of internal wall")
 }
 
 func TestVoltageSEDoesNotConsumePlantDemand(t *testing.T) {

@@ -15,6 +15,7 @@ import (
 	"github.com/jonas/reaktor-sim/internal/energy"
 	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/render"
+	"github.com/jonas/reaktor-sim/internal/rules"
 	"github.com/jonas/reaktor-sim/internal/sim"
 	"github.com/jonas/reaktor-sim/internal/stats"
 )
@@ -86,6 +87,16 @@ func main() {
 	}
 	rng := rand.New(rand.NewSource(*seed))
 
+	var financeCard finance.Card
+	if *financeID != "" {
+		var ok bool
+		financeCard, ok = finance.ByID(*financeID)
+		if !ok {
+			log.Fatalf("unbekannte Finanz-Karte %q", *financeID)
+		}
+	}
+	monthRules := rules.Month{FinanceID: financeCard.ID}
+
 	var state *board.State
 	var leftover board.PlayerLeftover
 	var err error
@@ -96,10 +107,10 @@ func main() {
 			log.Fatalf("prev-board: %v", err)
 		}
 		if *costP1 > 0 || *costP2 > 0 {
-			leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter)
+			leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, monthRules)
 		}
 	case *costP1 > 0 || *costP2 > 0:
-		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter)
+		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter, monthRules)
 	default:
 		state = board.Random(rng, *monthFilter)
 	}
@@ -113,21 +124,14 @@ func main() {
 		shiftDamage.Plant,
 	}
 
-	var financeCard finance.Card
-	if *financeID != "" {
-		var ok bool
-		financeCard, ok = finance.ByID(*financeID)
-		if !ok {
-			log.Fatalf("unbekannte Finanz-Karte %q", *financeID)
-		}
-	}
-
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = energy.Card{}
+	cfg.FinanceCard = financeCard
+	cfg.CriticalLimit = financeCard.CriticalLimit()
 	cfg.Shift = 1
 	cfg.RandomShift = false
 	cfg.ShiftDemands = shiftDemands
-	cfg.RepairBudget = repairBudgetForRun(state, financeCard, *repairBudget, leftover.Player2)
+	cfg.ReactorRepairBudget, cfg.RepairBudget = repairBudgetsForRun(state, financeCard, *repairBudget, leftover.Player1, leftover.Player2)
 	preview := state.Clone()
 	preview.ApplyDemands(cfg.ShiftDemands)
 	previewChips := sim.EmitterChips(preview, cfg, rng)
@@ -143,15 +147,22 @@ func main() {
 	if leftover.Player1 > 0 || leftover.Player2 > 0 {
 		fmt.Printf("Restbudget: Reaktor %d Geld | Stromnetz %d Geld\n", leftover.Player1, leftover.Player2)
 	}
-	fmt.Printf("Bedarfe: I=%d W=%d b=%d R=%d | Schaden: I=%d W=%d b=%d R=%d\n",
+	fmt.Printf("Bedarfe: I=%d W=%d b=%d R=%d | Schaden: I=%d W=%d b=%d R=%d",
 		shiftDemands.Industry, shiftDemands.Residential, shiftDemands.Rail, shiftDemands.Plant,
 		shiftDamage.Industry, shiftDamage.Residential, shiftDamage.Rail, shiftDamage.Plant)
+	if state.EmitterDamage > 0 {
+		fmt.Printf(" | Zünder-Schaden: %d", state.EmitterDamage)
+	}
+	fmt.Println()
+	if cfg.ReactorRepairBudget > 0 {
+		fmt.Printf("Zünder-Reparatur: bis zu %d Geld je Lauf (Restbudget Reaktor)\n", cfg.ReactorRepairBudget)
+	}
 	if cfg.RepairBudget > 0 {
-		fmt.Printf("Schaden-Reparatur: bis zu %d Geld je Lauf (Restbudget Stromnetz, zufaellige Chips)\n", cfg.RepairBudget)
+		fmt.Printf("Zonen-Reparatur: bis zu %d Geld je Lauf (Restbudget Stromnetz, zufaellige Chips)\n", cfg.RepairBudget)
 	} else if state.TotalPlayer2Damage() > 0 && leftover.Player2 > 0 && financeCard.RepairsAllowed() {
-		fmt.Println("Schaden-Reparatur: kein Restbudget Stromnetz nach Feld-Kauf")
+		fmt.Println("Zonen-Reparatur: kein Restbudget Stromnetz nach Feld-Kauf")
 	} else if state.TotalPlayer2Damage() > 0 && !financeCard.RepairsAllowed() {
-		fmt.Println("Schaden-Reparatur: nicht bewilligt (Finanz-Karte)")
+		fmt.Println("Zonen-Reparatur: nicht bewilligt (Finanz-Karte)")
 	}
 	printDemands(preview)
 
@@ -264,12 +275,15 @@ func main() {
 			log.Printf("Warnung: trace_index.yaml: %v", err)
 		}
 	}
-	report := stats.Build(state.PlayerCosts(), results)
+	report := stats.Build(state.PlayerCosts(), leftover, results)
 
 	printSummary(report)
 
 	initialView := render.ChipView{Queue: previewChips}
-	if err := render.WriteAll(preview, *outDir, initialView); err != nil {
+	if err := render.WriteAll(preview, *outDir, initialView, render.BoardMeta{
+		Seed:      *seed,
+		PrevBoard: *prevBoard,
+	}); err != nil {
 		log.Fatalf("Board rendern: %v", err)
 	}
 	if err := charts.WriteAll(report, *outDir); err != nil {
@@ -358,19 +372,16 @@ func financeCardIDs() string {
 	return strings.Join(ids, ", ")
 }
 
-func repairBudgetForRun(state *board.State, fin finance.Card, flagBudget, leftoverP2 int) int {
+func repairBudgetsForRun(state *board.State, fin finance.Card, flagGridBudget, leftoverP1, leftoverP2 int) (reactor, grid int) {
 	if !fin.RepairsAllowed() {
-		return 0
+		return 0, 0
 	}
-	total := state.TotalPlayer2Damage()
-	if total == 0 {
-		return 0
+	grid = flagGridBudget
+	if grid < 0 {
+		grid = board.GridRepairBudget(leftoverP2, state)
+	} else if total := state.TotalPlayer2Damage(); grid > total {
+		grid = total
 	}
-	if flagBudget >= 0 {
-		if flagBudget > total {
-			return total
-		}
-		return flagBudget
-	}
-	return board.GridRepairBudget(leftoverP2, state)
+	reactor = board.ReactorRepairBudget(leftoverP1, state)
+	return reactor, grid
 }

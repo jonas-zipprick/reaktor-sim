@@ -133,7 +133,7 @@ func TestWriteBoardYAML(t *testing.T) {
 	state := board.NewEmpty()
 	state.ApplyDemands(board.ShiftDemands{Industry: 1, Rail: 2})
 	path := filepath.Join(dir, "spielfeld.yaml")
-	if err := WriteBoardYAML(state, path); err != nil {
+	if err := WriteBoardYAML(state, path, BoardMeta{Seed: 42, PrevBoard: "b2_prev"}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
@@ -143,6 +143,12 @@ func TestWriteBoardYAML(t *testing.T) {
 	var doc boardYAML
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		t.Fatal(err)
+	}
+	if doc.Seed != 42 {
+		t.Fatalf("seed = %d, want 42", doc.Seed)
+	}
+	if doc.PrevBoard != "b2_prev" {
+		t.Fatalf("prev_board = %q, want b2_prev", doc.PrevBoard)
 	}
 	if len(doc.Demands) < 2 {
 		t.Fatalf("demands = %+v", doc.Demands)

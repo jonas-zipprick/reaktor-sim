@@ -51,7 +51,7 @@ var Catalog = map[Type]Info{
 	UraniumPlate:       {Name: "Uran-Platte", Cost: 5, InitialCharge: 2, MaxCharge: 2, Sector: "reactor", AvailableFromMonth: 3},
 	Tokamak:            {Name: "Tokamak-Kammer", Cost: 8, InitialCharge: -1, Sector: "reactor", AvailableFromMonth: 4},
 	Relay:              {Name: "Relais/Weiche", Cost: 1, Sector: "grid"},
-	Transformer:        {Name: "Transformator", Cost: 2, InitialCharge: 6, MaxCharge: 6, Sector: "grid"},
+	Transformer:        {Name: "Transformator", Cost: 3, InitialCharge: 6, MaxCharge: 6, Sector: "grid"},
 	Ground:             {Name: "Erdung/Widerstand", Cost: 1, Sector: "grid"},
 	EmergencyGenerator: {Name: "Notgenerator", Cost: 3, InitialCharge: 2, MaxCharge: 2, Sector: "grid"},
 	LeadAccumulator:    {Name: "Blei-Akkumulator", Cost: 3, MaxCharge: 2, Sector: "grid", AvailableFromMonth: 2},

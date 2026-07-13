@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/jonas/reaktor-sim/internal/board"
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 func scanWorkers() int {
@@ -122,7 +123,7 @@ func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, 
 					return
 				}
 				rng := rand.New(rand.NewSource(seed))
-				state, endLeft, err := buildInitialBoard(rng, opts)
+				state, endLeft, shift1Prev, err := prepareShift1Board(rng, opts)
 				if err != nil {
 					tracker.setErr(fmt.Errorf("seed %d: %w", seed, err))
 					return
@@ -132,7 +133,7 @@ func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, 
 					tracker.finish(true)
 					continue
 				}
-				out := evaluateShift(seed, state, opts, 1, "", [4]int{}, [4]int{}, board.PlayerLeftover{}, endLeft)
+				out := evaluateShift(seed, state, opts, 1, shift1Prev, [4]int{}, [4]int{}, 0, board.PlayerLeftover{}, endLeft)
 				collector.add(out)
 				tracker.finish(false)
 			}
@@ -182,20 +183,25 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 					tracker.setErr(fmt.Errorf("schicht %d, board %s: %w", k, carryFP, err))
 					return
 				}
+				base.Damage = job.parent.damage
+				base.EmitterDamage = job.parent.emitterDamage
 				rng := rand.New(rand.NewSource(job.seed))
 				budgetP1 := opts.Finance.ReactorBudget + job.parent.leftover.Player1
 				budgetP2 := opts.Finance.GridBudget + job.parent.leftover.Player2
-				endLeft, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter)
+				endLeft, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter, rules.Month{
+					EnergyID:  opts.EnergyCard.ID,
+					FinanceID: opts.Finance.ID,
+				})
 				if err != nil {
 					tracker.setErr(fmt.Errorf("schicht %d: %w", k, err))
 					return
 				}
-				key := board.Fingerprint(base) + carryKey(job.parent.demand, job.parent.damage, job.parent.leftover)
+				key := board.Fingerprint(base) + carryKey(job.parent.demand, job.parent.damage, job.parent.emitterDamage, job.parent.leftover)
 				if !collector.tryClaim(key) {
 					tracker.finish(true)
 					continue
 				}
-				out := evaluateShift(job.seed, base, opts, k, job.parent.prevFP, job.parent.demand, job.parent.damage, job.parent.leftover, endLeft)
+				out := evaluateShift(job.seed, base, opts, k, job.parent.prevFP, job.parent.demand, job.parent.damage, job.parent.emitterDamage, job.parent.leftover, endLeft)
 				collector.add(out)
 				tracker.finish(false)
 			}

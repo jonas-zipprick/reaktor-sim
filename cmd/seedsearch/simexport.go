@@ -9,6 +9,7 @@ import (
 	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/charts"
 	"github.com/jonas/reaktor-sim/internal/energy"
+	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/render"
 	"github.com/jonas/reaktor-sim/internal/seedsearch"
 	"github.com/jonas/reaktor-sim/internal/sim"
@@ -28,7 +29,7 @@ var topTables = []topTable{
 	{"top_loops", seedsearch.TopLoops},
 }
 
-func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, runs, keep int) error {
+func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, fin finance.Card, runs, keep int) error {
 	if len(scan.Shifts) == 0 {
 		return nil
 	}
@@ -42,6 +43,13 @@ func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, runs
 			continue
 		}
 		tableDir := filepath.Join(base, tbl.slug)
+		boardDirs := make(shiftBoardDirs)
+		type pendingLink struct {
+			outDir string
+			shift  int
+			prevFP string
+		}
+		var pending []pendingLink
 		for _, row := range rows {
 			chain, err := seedsearch.TraceChain(scan, row, card)
 			if err != nil {
@@ -49,16 +57,33 @@ func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, runs
 			}
 			for _, o := range chain {
 				outDir := filepath.Join(tableDir, seedsearch.ShiftDirName(o))
-				if err := writeSimExport(outDir, o, runs); err != nil {
+				if err := writeSimExport(outDir, o, chain[:o.Shift], card, fin, runs); err != nil {
 					return fmt.Errorf("%s %s: %w", tbl.slug, seedsearch.ShiftDirName(o), err)
 				}
+				boardDirs.register(o.Shift, o.BoardFingerprint, outDir)
+				if o.Shift > 1 && o.PrevBoardFingerprint != "" {
+					pending = append(pending, pendingLink{
+						outDir: outDir,
+						shift:  o.Shift,
+						prevFP: o.PrevBoardFingerprint,
+					})
+				}
+			}
+		}
+		for _, p := range pending {
+			prevDir, ok := boardDirs.lookup(p.shift-1, p.prevFP)
+			if !ok {
+				continue
+			}
+			if err := linkToPrevShift(p.outDir, prevDir); err != nil {
+				return fmt.Errorf("%s: vorschicht symlink (prev %s): %w", tbl.slug, p.prevFP, err)
 			}
 		}
 	}
 	return nil
 }
 
-func writeSimExport(outDir string, o seedsearch.Outcome, runs int) error {
+func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearch.Outcome, card energy.Card, fin finance.Card, runs int) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
@@ -68,12 +93,16 @@ func writeSimExport(outDir string, o seedsearch.Outcome, runs int) error {
 		return fmt.Errorf("board: %w", err)
 	}
 	state.Damage = o.StartDamage
+	state.EmitterDamage = o.StartEmitterDamage
 
 	cfg := sim.DefaultConfig()
-	cfg.EnergyCard = energy.Card{}
+	cfg.EnergyCard = card
+	cfg.FinanceCard = fin
+	cfg.CriticalLimit = fin.CriticalLimit()
 	cfg.Shift = o.Shift
 	cfg.RandomShift = false
 	cfg.ShiftDemands = o.StartDemands
+	cfg.ReactorRepairBudget = o.ReactorRepairBudget
 	cfg.RepairBudget = o.RepairBudget
 
 	rng := rand.New(rand.NewSource(o.Seed))
@@ -101,7 +130,11 @@ func writeSimExport(outDir string, o seedsearch.Outcome, runs int) error {
 	})
 
 	results := sim.RunMonteCarlo(state, runs, o.Seed, cfg)
-	report := stats.Build(state.PlayerCosts(), results)
+	report := stats.Build(state.PlayerCosts(), o.EndLeftover, results)
+	if len(chainPrefix) > 1 {
+		cm := seedsearch.CampaignMoneyFromChain(chainPrefix, fin)
+		report.Campaign = &cm
+	}
 
 	for loopNum, mcRun := range sim.LoopTraceRunIndices(results, 1) {
 		loopRNG := rand.New(rand.NewSource(o.Seed + int64(mcRun)))
@@ -148,11 +181,44 @@ func writeSimExport(outDir string, o seedsearch.Outcome, runs int) error {
 		return fmt.Errorf("trace index: %w", err)
 	}
 
-	if err := render.WriteAll(preview, outDir, render.ChipView{Queue: previewChips}); err != nil {
+	if err := render.WriteAll(preview, outDir, render.ChipView{Queue: previewChips}, render.BoardMeta{
+		Seed:      o.Seed,
+		PrevBoard: o.PrevBoardFingerprint,
+	}); err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
 	if err := charts.WriteAll(report, outDir); err != nil {
 		return fmt.Errorf("charts: %w", err)
 	}
 	return nil
+}
+
+// linkToPrevShift creates outDir/vorschicht -> prevOutDir (relative symlink).
+func linkToPrevShift(outDir, prevOutDir string) error {
+	linkPath := filepath.Join(outDir, "vorschicht")
+	_ = os.Remove(linkPath)
+	rel, err := filepath.Rel(outDir, prevOutDir)
+	if err != nil {
+		return err
+	}
+	return os.Symlink(rel, linkPath)
+}
+
+// shiftBoardDirs maps exported shift folders by board fingerprint (prev_board target).
+type shiftBoardDirs map[int]map[string]string
+
+func (m shiftBoardDirs) register(shift int, boardFP, dir string) {
+	if m[shift] == nil {
+		m[shift] = make(map[string]string)
+	}
+	m[shift][boardFP] = dir
+}
+
+func (m shiftBoardDirs) lookup(shift int, boardFP string) (string, bool) {
+	dirs, ok := m[shift]
+	if !ok {
+		return "", false
+	}
+	dir, ok := dirs[boardFP]
+	return dir, ok
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/energy"
 	"github.com/jonas/reaktor-sim/internal/field"
+	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/graph"
 	"github.com/jonas/reaktor-sim/internal/hex"
 )
@@ -44,8 +45,10 @@ type Result struct {
 	AllDemandsMet     bool
 	EndDemands        [4]int // remaining demand per board.Zone at run end
 	EndDamage         [4]int // remaining damage per board.Zone at run end
+	EndEmitterDamage  int    // remaining igniter damage at run end
 	Shift             int    // energy-card shift used for this run (1-5)
-	RepairSpent       int    // money spent on damage repair at shift start
+	ReactorRepairSpent int   // money spent on igniter repair at shift start
+	RepairSpent       int    // money spent on grid damage repair at shift start
 }
 
 // Snapshot captures board and graph state after a simulation step.
@@ -64,35 +67,41 @@ type Snapshot struct {
 type Config struct {
 	MaxSteps      int
 	CriticalLimit int
-	StartDir      int // 0-5 travel override for tests, or -1 = random NO/O/SO per chip
+	StartDir      int // 0-5 emitter shoot override per run, or -1 = random once per run
 	ShiftDemands  board.ShiftDemands
 	EnergyCard    energy.Card // when set, overrides ShiftDemands per run
+	FinanceCard   finance.Card
 	Shift         int         // 1-5 for EnergyCard
-	RandomShift   bool        // pick shift 1-5 per Monte-Carlo run
-	RepairBudget  int         // max money for damage repair per run (1 per chip); 0 = none
-	Trace         bool
+	RandomShift          bool // pick shift 1-5 per Monte-Carlo run
+	ReactorRepairBudget  int  // max money for igniter repair per run (1 per chip); 0 = none
+	RepairBudget         int  // max money for grid damage repair per run (1 per chip); 0 = none
+	Trace                bool
 	InitialChips  []Chip
 }
 
 func DefaultConfig() Config {
 	card := energy.DefaultCard()
+	fin := finance.DefaultCard()
 	return Config{
 		MaxSteps:      MaxStepsPerRun,
-		CriticalLimit: 8,
+		CriticalLimit: fin.CriticalLimit(),
 		EnergyCard:    card,
+		FinanceCard:   fin,
 		Shift:         1,
 		ShiftDemands:  card.ShiftDemands(1),
 	}
 }
 
 type engine struct {
-	board        *board.State
-	graph        *graph.Graph
-	queue        []Chip
-	res          Result
-	rng          *rand.Rand
-	cfg          Config
-	trace        []Snapshot
+	board           *board.State
+	graph           *graph.Graph
+	queue           []Chip
+	res             Result
+	rng             *rand.Rand
+	cfg             Config
+	emitterShootDir int // fixed for entire run (Zünder)
+	turbineShootDir int // fixed for entire run (Turbine voltage)
+	trace           []Snapshot
 	step         int
 	lastResolved Chip
 	hasResolved  bool
@@ -164,10 +173,16 @@ func absInt(x int) int {
 }
 
 func run(state *board.State, rng *rand.Rand, cfg Config) (Result, *board.State, []Snapshot) {
+	emitterDir, turbineDir := pickRunShootDirs(cfg, rng)
 	e := &engine{
-		board: state.Clone(),
-		rng:   rng,
-		cfg:   cfg,
+		board:           state.Clone(),
+		rng:             rng,
+		cfg:             cfg,
+		emitterShootDir: emitterDir,
+		turbineShootDir: turbineDir,
+	}
+	if cfg.ReactorRepairBudget > 0 {
+		e.res.ReactorRepairSpent = e.board.RepairEmitterDamage(cfg.ReactorRepairBudget)
 	}
 	if cfg.RepairBudget > 0 {
 		e.res.RepairSpent = e.board.RepairRandomDamage(e.rng, cfg.RepairBudget)
@@ -179,8 +194,8 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, *board.State, 
 	e.queue = make([]Chip, 0, 64)
 	if cfg.InitialChips != nil {
 		e.queue = append(e.queue, cfg.InitialChips...)
-	} else {
-		e.queue = append(e.queue, EmitterChips(e.board, cfg, e.rng)...)
+	} else if hasOutstandingDemand(e.board) {
+		e.queue = append(e.queue, emitterChips(e.board, cfg, e.rng, e.emitterShootDir)...)
 	}
 	e.queue = append(e.queue, shiftStartChips(e.board, e.rng)...)
 	e.graph = graph.BuildFlow(e.board, e.inFlight())
@@ -227,6 +242,7 @@ func (e *engine) captureEndState() {
 		e.res.EndDemands[z] = e.board.TotalDemand(z)
 		e.res.EndDamage[z] = e.board.TotalDamage(z)
 	}
+	e.res.EndEmitterDamage = e.board.EmitterDamage
 }
 
 func finalizeTrace(snaps []Snapshot) []Snapshot {
@@ -364,6 +380,7 @@ func (e *engine) resolve(chip Chip) {
 	nextPos := chip.Pos.Neighbor(chip.Dir)
 
 	if nextPos.IsEmitter() {
+		e.board.AddEmitterDamage()
 		e.recordStep("Zuender-Treffer", &chip)
 		return
 	}
@@ -397,28 +414,18 @@ func (e *engine) resolve(chip Chip) {
 	incoming := (chip.Dir + 3) % 6
 	tileTypeBefore := tile.Type
 
-	destroyedEmergencyGen := tile.Type == field.EmergencyGenerator && chip.Type == ChipVoltage
-	newChips, graphChanged := react(e.board, e.graph, nextPos, tile, chip, incoming, e.rng)
-	if destroyedEmergencyGen {
-		e.purgeChipsAt(nextPos)
-		newChips = nil
-		graphChanged = true
-		e.lastEmitted = nil
+	newChips, graphChanged := react(e.board, e.graph, nextPos, tile, chip, incoming, e.cfg.EnergyCard.ID, e.rng)
+	if chargeBefore > tile.Charge && isFuelEmitter(tile.Type) && chip.Type == chipTypeForFuel(tile.Type) {
+		e.lastEmitted = newChips
 	} else {
-		if chargeBefore > tile.Charge && isFuelEmitter(tile.Type) && chip.Type == chipTypeForFuel(tile.Type) {
-			e.lastEmitted = newChips
-		} else {
-			e.lastEmitted = nil
-		}
-		e.queue = append(e.queue, newChips...)
+		e.lastEmitted = nil
 	}
+	e.queue = append(e.queue, newChips...)
 	if graphChanged {
 		graph.Rebuild(e.graph, e.board, e.inFlight())
 	}
 	event := "Feldreaktion"
-	if destroyedEmergencyGen {
-		event = "Notgenerator zerstoert"
-	} else if tileTypeBefore == field.CapacitorBank && tile.Type == field.Empty && len(newChips) > 0 {
+	if tileTypeBefore == field.CapacitorBank && tile.Type == field.Empty && len(newChips) > 0 {
 		event = "Kondensator explodiert"
 	}
 	e.recordStep(event, &chip)
@@ -435,6 +442,10 @@ func tryBurnedRedirect(e *engine, pos hex.Coord, tile *field.Tile, chip Chip) bo
 		}
 	case field.Transformer:
 		// any chip type
+	case field.EmergencyGenerator:
+		if chip.Type != ChipVoltage {
+			return false
+		}
 	default:
 		return false
 	}
@@ -508,13 +519,8 @@ func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
 			return
 		}
 		if chip.Type == ChipHeat {
-			reflected := Chip{
-				Type: ChipHeat,
-				Pos:  chip.Pos,
-				Dir:  e.reflectOffWall(chip.Pos, chip.Dir),
-			}
-			e.queue = append(e.queue, reflected)
-			e.recordStep("Waerme-Reflektion", &reflected)
+			event, active := e.processTurbine(chip)
+			e.recordStep(event, active)
 			return
 		}
 		e.recordStep("Innere Wand", &chip)
@@ -581,14 +587,34 @@ func shootDir(cfg Config, rng *rand.Rand) int {
 	return hex.RandomShootDir(rng)
 }
 
-// EmitterChips returns the chip fired from the igniter at shift start.
+func pickRunShootDirs(cfg Config, rng *rand.Rand) (emitter, turbine int) {
+	return shootDir(cfg, rng), hex.RandomShootDir(rng)
+}
+
+// EmitterChips returns the chip fired from the igniter at shift start when demand
+// remains on the board. All chips share one shoot direction (picked once per call).
 func EmitterChips(state *board.State, cfg Config, rng *rand.Rand) []Chip {
-	pos := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
-	ct := ChipHeat
-	if hasUraniumField(state) && rng.Intn(2) == 1 {
-		ct = ChipNeutron
+	if !hasOutstandingDemand(state) {
+		return nil
 	}
-	return []Chip{{Type: ct, Pos: pos, Dir: shootDir(cfg, rng)}}
+	return emitterChips(state, cfg, rng, shootDir(cfg, rng))
+}
+
+func emitterChips(state *board.State, cfg Config, rng *rand.Rand, dir int) []Chip {
+	pos := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
+	count := 1
+	if cfg.EnergyCard.ID == "schturmowschtschina" {
+		count = 2
+	}
+	chips := make([]Chip, 0, count)
+	for i := 0; i < count; i++ {
+		ct := ChipHeat
+		if count == 1 && hasUraniumField(state) && rng.Intn(2) == 1 {
+			ct = ChipNeutron
+		}
+		chips = append(chips, Chip{Type: ct, Pos: pos, Dir: dir})
+	}
+	return chips
 }
 
 func hasUraniumField(state *board.State) bool {
@@ -600,16 +626,6 @@ func hasUraniumField(state *board.State) bool {
 	return false
 }
 
-func (e *engine) purgeChipsAt(c hex.Coord) {
-	n := 0
-	for _, chip := range e.queue {
-		if chip.Pos != c {
-			e.queue[n] = chip
-			n++
-		}
-	}
-	e.queue = e.queue[:n]
-}
 
 func (e *engine) maybeVoluntaryFire() bool {
 	if e.res.CriticalFailure {
@@ -628,7 +644,7 @@ func (e *engine) maybeVoluntaryFire() bool {
 				sources = append(sources, source{c, t.Type})
 			}
 		case field.EmergencyGenerator:
-			if !t.BurnedOut && t.Charge > 0 {
+			if !t.BurnedOut && t.Charge > 0 && emergencyGeneratorMayFire(e) {
 				sources = append(sources, source{c, t.Type})
 			}
 		}
@@ -644,6 +660,9 @@ func (e *engine) maybeVoluntaryFire() bool {
 	switch src.kind {
 	case field.EmergencyGenerator:
 		tile.Charge--
+		if tile.Charge <= 0 {
+			tile.BurnedOut = true
+		}
 	default:
 		tile.StoredVoltage--
 	}
@@ -658,12 +677,39 @@ func (e *engine) maybeVoluntaryFire() bool {
 	return true
 }
 
+// emergencyGeneratorMayFire applies player-2 heuristics for voluntary Notgenerator shots.
+func emergencyGeneratorMayFire(e *engine) bool {
+	if !hasOutstandingDemand(e.board) {
+		return false
+	}
+	return !player1HeatLoose(e.queue)
+}
+
+func hasOutstandingDemand(s *board.State) bool {
+	return !AllDemandsMet(s)
+}
+
+func player1HeatLoose(chips []Chip) bool {
+	for _, c := range chips {
+		if c.Type != ChipHeat {
+			continue
+		}
+		if c.Pos.IsPlayer1() || c.Pos.IsEmitter() {
+			return true
+		}
+	}
+	return false
+}
+
 func looseChipsOnSide(b *board.State, chips []Chip, player1 bool) int {
 	count := 0
 	for _, chip := range chips {
 		if chip.Pos.IsPlayer1() == player1 {
 			count++
 		}
+	}
+	if player1 {
+		count += b.EmitterDamage
 	}
 	if !player1 {
 		// Schadens-Chips are geloest; StoredVoltage in Speichern is gebunden until fired.
@@ -691,7 +737,7 @@ func (e *engine) processTurbine(chip Chip) (event string, active *Chip) {
 		e.queue = append(e.queue, Chip{
 			Type: ChipVoltage,
 			Pos:  tCoord,
-			Dir:  hex.RandomShootDir(e.rng),
+			Dir:  e.turbineShootDir,
 		})
 		return "Turbine", &chip
 	case ChipVoltage:
@@ -709,7 +755,7 @@ func passThrough(chip Chip, pos hex.Coord) []Chip {
 	return []Chip{{Type: chip.Type, Pos: pos, Dir: chip.Dir}}
 }
 
-func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip Chip, incoming int, rng *rand.Rand) ([]Chip, bool) {
+func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip Chip, incoming int, energyCardID string, rng *rand.Rand) ([]Chip, bool) {
 	graphChanged := false
 
 	switch tile.Type {
@@ -731,12 +777,18 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return []Chip{{Type: chip.Type, Pos: pos, Dir: out}}, false
 
 	case field.CoolingTower:
+		if energyCardID == "testlauf-volllast" {
+			return passThrough(chip, pos), false
+		}
 		if chip.Type == ChipHeat {
 			return nil, false
 		}
 		return passThrough(chip, pos), false
 
 	case field.AbsorberRod:
+		if energyCardID == "testlauf-volllast" {
+			return passThrough(chip, pos), false
+		}
 		if chip.Type == ChipNeutron {
 			return nil, false
 		}
@@ -829,10 +881,6 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return []Chip{{Type: ChipVoltage, Pos: target, Dir: tile.SuperTarget.TravelDir()}}, false
 
 	case field.EmergencyGenerator:
-		if chip.Type == ChipVoltage {
-			*tile = field.Tile{Type: field.Empty}
-			return nil, true
-		}
 		return passThrough(chip, pos), false
 	}
 

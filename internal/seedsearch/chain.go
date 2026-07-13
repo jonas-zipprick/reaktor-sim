@@ -36,6 +36,9 @@ func findParent(candidates []Outcome, child Outcome, childShift int, card energy
 		if o.MedianEndDamage != child.StartDamage {
 			continue
 		}
+		if o.MedianEndEmitterDamage != child.StartEmitterDamage {
+			continue
+		}
 		if o.MedianEndDemand != wantDemand {
 			continue
 		}

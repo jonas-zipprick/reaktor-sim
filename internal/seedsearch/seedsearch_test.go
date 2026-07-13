@@ -1,9 +1,11 @@
 package seedsearch_test
 
 import (
+	"math/rand"
 	"reflect"
 	"testing"
 
+	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/energy"
 	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/seedsearch"
@@ -79,6 +81,46 @@ func TestScanMultiShiftStructure(t *testing.T) {
 				t.Fatalf("outcome shift = %d, want %d", o.Shift, i+1)
 			}
 		}
+	}
+}
+
+func TestScanWithStartBoard(t *testing.T) {
+	base := board.Random(rand.New(rand.NewSource(99)), 0)
+	fp := board.Fingerprint(base)
+
+	opts := baseOptions()
+	opts.Runs = 2
+	opts.StartBoardFingerprint = fp
+	scan, err := seedsearch.Scan(1, 4, opts, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scan.Shifts[0].Outcomes) == 0 {
+		t.Fatal("expected outcomes with start board")
+	}
+	for _, o := range scan.Shifts[0].Outcomes {
+		if o.PrevBoardFingerprint != fp {
+			t.Fatalf("prev board = %q, want %q", o.PrevBoardFingerprint, fp)
+		}
+		if o.BoardFingerprint == fp {
+			t.Fatalf("seed %d: board unchanged after purchases", o.Seed)
+		}
+	}
+}
+
+func TestScanWithStartBoardInvalidFingerprint(t *testing.T) {
+	opts := baseOptions()
+	opts.StartBoardFingerprint = "not-a-board"
+	_, err := seedsearch.EvaluateChain(1, opts)
+	if err == nil {
+		t.Fatal("expected error for invalid fingerprint")
+	}
+}
+
+func TestAllDemandsMax1DamageRate(t *testing.T) {
+	o := seedsearch.Outcome{AllDemandsMax1Damage: 7, Runs: 10}
+	if got := o.AllDemandsMax1DamageRate(); got != 0.7 {
+		t.Fatalf("rate = %v, want 0.7", got)
 	}
 }
 

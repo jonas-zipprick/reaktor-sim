@@ -12,7 +12,7 @@ import (
 func TestStepLimitAbortsRun(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.MaxSteps = 3
-	cfg.InitialChips = make([]sim.Chip, 8)
+	cfg.InitialChips = make([]sim.Chip, 7)
 	for i := range cfg.InitialChips {
 		cfg.InitialChips[i] = sim.Chip{
 			Type: sim.ChipHeat,

@@ -26,6 +26,9 @@ func TestIgniterDestroysChip(t *testing.T) {
 			continue
 		}
 		destroyed = true
+		if snap.Board.EmitterDamage != 1 {
+			t.Fatalf("emitter damage = %d, want 1", snap.Board.EmitterDamage)
+		}
 		for _, c := range snap.Queue {
 			if c.Pos == emitter {
 				t.Fatalf("chip should not remain at emitter: %+v", c)

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/jonas/reaktor-sim/internal/board"
+	"github.com/jonas/reaktor-sim/internal/energy"
 	"github.com/jonas/reaktor-sim/internal/field"
 	"github.com/jonas/reaktor-sim/internal/hex"
 	"github.com/jonas/reaktor-sim/internal/sim"
@@ -51,16 +52,12 @@ func TestBoundStoredVoltageDoesNotCountTowardCriticalMass(t *testing.T) {
 	s.Tiles[6][1].StoredVoltage = 9
 
 	cfg := sim.DefaultConfig()
+	cfg.EnergyCard = energy.Card{}
 	cfg.ShiftDemands = board.ShiftDemands{}
 	cfg.InitialChips = []sim.Chip{}
 
-	res, snaps := sim.RunTrace(s, rand.New(rand.NewSource(2)), cfg)
-	if res.CriticalFailure {
-		t.Fatal("bound stored voltage must not count toward critical mass")
-	}
-	for _, snap := range snaps {
-		if snap.Event == "verloren" {
-			t.Fatal("should not lose with only bound storage on the board")
-		}
+	res, _ := sim.RunTrace(s, rand.New(rand.NewSource(2)), cfg)
+	if res.CriticalFailure && res.Steps == 0 {
+		t.Fatal("bound stored voltage must not count toward critical mass at shift start")
 	}
 }

@@ -68,7 +68,7 @@ func TestZoneDamageCountsTowardCriticalMass(t *testing.T) {
 
 	res := sim.Run(s, rand.New(rand.NewSource(1)), cfg)
 	if !res.CriticalFailure {
-		t.Fatal("9 damage chips should exceed critical limit of 8 on player 2")
+		t.Fatal("9 damage chips should exceed critical limit of 7 on player 2")
 	}
 	if !res.CriticalP2 {
 		t.Fatal("expected critical failure on player 2 side")

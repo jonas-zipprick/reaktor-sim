@@ -6,6 +6,7 @@ import (
 
 	"github.com/jonas/reaktor-sim/internal/field"
 	"github.com/jonas/reaktor-sim/internal/hex"
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 // Zone is a demand region on the player-2 border.
@@ -35,9 +36,10 @@ func (z Zone) String() string {
 
 // State is a full board placement with tile data.
 type State struct {
-	Tiles   [hex.Cols][hex.Rows]field.Tile
-	Demands map[hex.Coord][4]int
-	Damage  [4]int // per Zone: accumulated Schadens-Chips
+	Tiles         [hex.Cols][hex.Rows]field.Tile
+	Demands       map[hex.Coord][4]int
+	Damage        [4]int // per Zone: accumulated Schadens-Chips
+	EmitterDamage int    // Schadens-Chips on the Zuender (player 1)
 }
 
 func NewEmpty() *State {
@@ -100,7 +102,7 @@ func Random(rng *rand.Rand, monthFilter int) *State {
 			continue
 		}
 		t := market[rng.Intn(len(market))]
-		placeTile(s, c, t, rng)
+		placeTile(s, c, t, rng, rules.Month{})
 	}
 	return s
 }
@@ -120,5 +122,6 @@ func (s *State) Clone() *State {
 		}
 	}
 	c.Damage = s.Damage
+	c.EmitterDamage = s.EmitterDamage
 	return c
 }

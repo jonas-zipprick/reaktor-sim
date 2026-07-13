@@ -11,9 +11,15 @@ import (
 	"github.com/jonas/reaktor-sim/internal/hex"
 )
 
+// BoardMeta records how the board was generated for spielfeld YAML export.
+type BoardMeta struct {
+	Seed      int64  // random seed used for board purchases
+	PrevBoard string // fingerprint of the carried-in previous-shift board (empty on shift 1)
+}
+
 // WriteBoardYAML saves structured board state for downstream tooling.
-func WriteBoardYAML(state *board.State, path string) error {
-	return writeYAML(path, buildBoardYAML(state))
+func WriteBoardYAML(state *board.State, path string, meta BoardMeta) error {
+	return writeYAML(path, buildBoardYAML(state, meta))
 }
 
 // WriteGraphText saves a textual edge list of the flow graph.
@@ -61,7 +67,7 @@ func sortCoords(coords []hex.Coord) {
 }
 
 // WriteAll saves board renderings to outDir using spielfeld-<fingerprint> filenames.
-func WriteAll(state *board.State, outDir string, view ChipView) error {
+func WriteAll(state *board.State, outDir string, view ChipView, meta BoardMeta) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
@@ -72,7 +78,7 @@ func WriteAll(state *board.State, outDir string, view ChipView) error {
 		name string
 	}{
 		{func() error { return WriteBoardPNG(state, filepath.Join(outDir, base+".png"), view) }, base + ".png"},
-		{func() error { return WriteBoardYAML(state, filepath.Join(outDir, base+".yaml")) }, base + ".yaml"},
+		{func() error { return WriteBoardYAML(state, filepath.Join(outDir, base+".yaml"), meta) }, base + ".yaml"},
 	}
 	for _, f := range files {
 		if err := f.fn(); err != nil {
