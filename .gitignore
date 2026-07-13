@@ -1,4 +1,4 @@
 # Sim-Ausgabe: Charts/Histogramme im Root ignorieren, Trace-Ordner sichtbar lassen
-output
-seedsearch-out
-seedsearch
+/output/
+/seedsearch-out/
+/seedsearch
