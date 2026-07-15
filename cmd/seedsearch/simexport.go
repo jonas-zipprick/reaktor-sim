@@ -39,11 +39,15 @@ func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, fin 
 		return nil
 	}
 	last := scan.Shifts[len(scan.Shifts)-1]
+	lastOutcomes, err := last.LoadOutcomes()
+	if err != nil {
+		return err
+	}
 	base := filepath.Join(dir, fmt.Sprintf("top_sims_schicht_%d", last.Shift))
 
 	seen := make(map[string]struct{})
 	for _, tbl := range topTables {
-		rows := seedsearch.PickUniqueOutcomes(last.Outcomes, tbl.pick, keep, seen)
+		rows := seedsearch.PickUniqueOutcomes(lastOutcomes, tbl.pick, keep, seen)
 		if len(rows) == 0 {
 			continue
 		}

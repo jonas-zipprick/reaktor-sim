@@ -25,6 +25,7 @@ type Options struct {
 	MonthFilter           int          // campaign month for field availability (0 = all fields)
 	Workers               int          // parallel scan workers (0 = GOMAXPROCS)
 	StartBoardFingerprint string       // if set, shift 1 loads this board and spends budget per seed
+	SpillDir              string       // if set, shift outcomes are written here and released from RAM
 }
 
 // shiftCount clamps the configured shift count to the valid 1-5 range.
@@ -435,15 +436,19 @@ func medianInt(vals []int) int {
 type ProgressFunc func(done, total int64, shift int)
 
 // ShiftResult holds all seed outcomes for one shift.
+// Outcomes is nil when results were spilled to spillPath during Scan.
 type ShiftResult struct {
-	Shift    int
-	Outcomes []Outcome
+	Shift        int
+	Outcomes     []Outcome
+	spillPath    string
+	outcomeCount int
 }
 
 // ScanResult holds per-shift outcomes from a seed range scan.
 type ScanResult struct {
 	Shifts            []ShiftResult
 	SkippedDuplicates int64
+	spillDir          string
 }
 
 // parentBoard is a board kept from one shift to branch into the next: its
@@ -491,7 +496,7 @@ func Scan(from, to int64, opts Options, progress ProgressFunc) (ScanResult, erro
 		return ScanResult{}, fmt.Errorf("from (%d) > to (%d)", from, to)
 	}
 	shifts := opts.shiftCount()
-	var result ScanResult
+	result := ScanResult{spillDir: opts.SpillDir}
 	tracker := newScanTracker(progress, EstimateScanWork(from, to, opts))
 	tracker.setShift(1)
 
@@ -499,8 +504,12 @@ func Scan(from, to int64, opts Options, progress ProgressFunc) (ScanResult, erro
 	if err != nil {
 		return ScanResult{}, err
 	}
-	result.Shifts = append(result.Shifts, ShiftResult{Shift: 1, Outcomes: shift1})
 	parents := selectParents(shift1, opts.shiftKeep())
+	sr1 := ShiftResult{Shift: 1, Outcomes: shift1}
+	if err := spillShiftResult(&sr1, opts.SpillDir); err != nil {
+		return ScanResult{}, err
+	}
+	result.Shifts = append(result.Shifts, sr1)
 
 	for k := 2; k <= shifts; k++ {
 		tracker.setShift(k)
@@ -509,10 +518,16 @@ func Scan(from, to int64, opts Options, progress ProgressFunc) (ScanResult, erro
 			return ScanResult{}, err
 		}
 		if k >= 2 {
-			result.Shifts[k-2].Outcomes = pruneShiftOutcomes(result.Shifts[k-2].Outcomes, outcomes)
+			if err := prunePreviousShift(&result.Shifts[k-2], outcomes, opts.SpillDir); err != nil {
+				return ScanResult{}, err
+			}
 		}
-		result.Shifts = append(result.Shifts, ShiftResult{Shift: k, Outcomes: outcomes})
 		parents = selectParents(outcomes, opts.shiftKeep())
+		sr := ShiftResult{Shift: k, Outcomes: outcomes}
+		if err := spillShiftResult(&sr, opts.SpillDir); err != nil {
+			return ScanResult{}, err
+		}
+		result.Shifts = append(result.Shifts, sr)
 	}
 	result.SkippedDuplicates = tracker.skipped.Load()
 	return result, nil

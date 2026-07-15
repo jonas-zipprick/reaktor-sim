@@ -37,6 +37,7 @@ func main() {
 	tracePNG := flag.Bool("trace-png", true, "Schritt-PNGs in Top-Sim-Traces schreiben")
 	topSimCharts := flag.Bool("top-sim-charts", false, "Zusatz-Charts je Top-Sim (fuehrt Monte-Carlo erneut aus)")
 	outFull := flag.Bool("out-full", false, "YAML enthaelt alle Outcomes (sonst nur Top-Listen)")
+	spillDir := flag.String("spill-dir", "", "Zwischenergebnisse auf Disk (leer = bei -schichten>1 auto unter -charts-dir/.spill)")
 	monthFilter := flag.Int("month-filter", 0, "Kampagnenmonat: nur dann verfuegbare Felder kaufen (0 = alle)")
 	startBoard := flag.String("start-board", "", "Board-Fingerprint als Startbrett (Folgemonat: Kaufvarianten statt Neugenerierung)")
 	flag.Parse()
@@ -95,6 +96,21 @@ func main() {
 		topSimCharts: *topSimCharts,
 	}
 
+	removeSpill := false
+	if *spillDir == "" && *shifts > 1 {
+		if *chartsDir != "" {
+			*spillDir = filepath.Join(*chartsDir, ".spill")
+		} else {
+			var err error
+			*spillDir, err = os.MkdirTemp("", "reaktor-seedsearch-spill-*")
+			if err != nil {
+				log.Fatalf("Spill-Verzeichnis: %v", err)
+			}
+			removeSpill = true
+		}
+	}
+	opts.SpillDir = *spillDir
+
 	total := *to - *from + 1
 	var reportBuf strings.Builder
 	out := io.MultiWriter(os.Stdout, &reportBuf)
@@ -112,6 +128,9 @@ func main() {
 	if *shifts > 1 {
 		fmt.Fprintf(out, "Schicht-Verzweigung: je %d Top-Boards aus %d Ranglisten × alle Seeds in Folgeschicht\n",
 			*shiftKeep, seedsearch.KeepTableCount)
+	}
+	if opts.SpillDir != "" {
+		fmt.Fprintf(out, "RAM-Sparmodus: Zwischenergebnisse in %s\n", opts.SpillDir)
 	}
 	for k := 1; k <= *shifts; k++ {
 		d := energyCard.ShiftDemands(k)
@@ -135,13 +154,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if removeSpill {
+		defer func() {
+			if err := scan.Cleanup(); err != nil {
+				log.Printf("Spill-Verzeichnis aufraeumen: %v", err)
+			}
+		}()
+	}
 	if bar != nil {
 		bar.Finish()
 	}
 
 	unique := 0
 	if len(scan.Shifts) > 0 {
-		unique = len(scan.Shifts[0].Outcomes)
+		unique = scan.Shifts[0].Len()
 	}
 	elapsed := time.Since(start)
 	fmt.Fprintf(out, "Fertig in %s (%.1f Seeds/s, %d eindeutige Bretter, %d Duplikate ausgefiltert)\n\n",
@@ -209,7 +235,11 @@ func printShiftBlock(w io.Writer, sr seedsearch.ShiftResult, card energy.Card, t
 	fmt.Fprintln(w, title)
 	fmt.Fprintln(w)
 
-	o := sr.Outcomes
+	o, err := sr.LoadOutcomes()
+	if err != nil {
+		fmt.Fprintf(w, "(Fehler beim Laden der Ergebnisse: %v)\n\n", err)
+		return
+	}
 	printTable(w, "Top Seeds: Alle Bedarfe erfuellt und beliebiger Schaden", seedsearch.TopWins(o, top), runs, winCols)
 	printTable(w, "Top Seeds: Alle Bedarfe erfuellt und kein Schaden", seedsearch.TopAllDemandsNoDamage(o, top), runs, allDemandsNoDamageCols)
 	printTable(w, "Top Seeds: Max. 1 Bedarf nicht erfuellt und kein Schaden", seedsearch.TopMax1DemandNoDamage(o, top), runs, max1DemandNoDamageCols)
@@ -236,8 +266,12 @@ func prepareChartsDir(dir string) error {
 func writeCharts(dir string, scan seedsearch.ScanResult, runs int) error {
 	multi := len(scan.Shifts) > 1
 	for _, sr := range scan.Shifts {
+		outcomes, err := sr.LoadOutcomes()
+		if err != nil {
+			return err
+		}
 		sub := shiftOutDir(dir, sr.Shift, multi)
-		if err := charts.WriteSeedsearchCharts(sub, sr.Outcomes, runs); err != nil {
+		if err := charts.WriteSeedsearchCharts(sub, outcomes, runs); err != nil {
 			return err
 		}
 	}
@@ -469,17 +503,21 @@ func writeYAML(path string, scan seedsearch.ScanResult, opts seedsearch.Options,
 		},
 	}
 	for _, sr := range scan.Shifts {
+		outcomes, err := sr.LoadOutcomes()
+		if err != nil {
+			return err
+		}
 		entry := shiftYAML{
 			Shift:                   sr.Shift,
 			Demand:                  shiftDemandsYAML(opts.EnergyCard.ShiftDemands(sr.Shift)),
-			TopWins:                 toOutcomeYAML(seedsearch.TopWins(sr.Outcomes, top)),
-			TopAllDemandsNoDamage:   toOutcomeYAML(seedsearch.TopAllDemandsNoDamage(sr.Outcomes, top)),
-			TopMax1DemandNoDamage:   toOutcomeYAML(seedsearch.TopMax1DemandNoDamage(sr.Outcomes, top)),
-			TopMax1DemandMax1Damage: toOutcomeYAML(seedsearch.TopMax1DemandMax1Damage(sr.Outcomes, top)),
-			TopLoops:                toOutcomeYAML(seedsearch.TopLoops(sr.Outcomes, top)),
+			TopWins:                 toOutcomeYAML(seedsearch.TopWins(outcomes, top)),
+			TopAllDemandsNoDamage:   toOutcomeYAML(seedsearch.TopAllDemandsNoDamage(outcomes, top)),
+			TopMax1DemandNoDamage:   toOutcomeYAML(seedsearch.TopMax1DemandNoDamage(outcomes, top)),
+			TopMax1DemandMax1Damage: toOutcomeYAML(seedsearch.TopMax1DemandMax1Damage(outcomes, top)),
+			TopLoops:                toOutcomeYAML(seedsearch.TopLoops(outcomes, top)),
 		}
 		if fullOutcomes {
-			entry.Outcomes = toOutcomeYAML(sr.Outcomes)
+			entry.Outcomes = toOutcomeYAML(outcomes)
 		}
 		doc.Shifts = append(doc.Shifts, entry)
 	}

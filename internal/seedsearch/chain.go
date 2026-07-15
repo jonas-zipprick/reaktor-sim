@@ -16,7 +16,11 @@ func TraceChain(scan ScanResult, final Outcome, card energy.Card) ([]Outcome, er
 	chain := []Outcome{final}
 	current := final
 	for k := current.Shift; k > 1; k-- {
-		parent, err := findParent(scan.Shifts[k-2].Outcomes, current, k, card)
+		prevOutcomes, err := scan.Shifts[k-2].LoadOutcomes()
+		if err != nil {
+			return nil, err
+		}
+		parent, err := findParent(prevOutcomes, current, k, card)
 		if err != nil {
 			return nil, err
 		}
