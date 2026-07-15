@@ -18,14 +18,14 @@ func TestVoltageIntoReactorWallConsumesPlantDemand(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 5, R: 0},
+		Pos:  hex.Coord{Q: 5, R: 1},
 		Dir:  hex.RotW.TravelDir(),
 	}}
 
 	s := board.NewEmpty()
 	// A mirror on the player-1 cell just past the wall reproduces the bug where
 	// voltage used to "passieren" the mirror into the reactor half.
-	s.Tiles[4][0] = field.NewTile(field.Mirror, hex.RotNW, 0)
+	s.Tiles[3][1] = field.NewTile(field.Mirror, hex.RotNW, 0)
 
 	rng := rand.New(rand.NewSource(1))
 	res, snaps := sim.RunTrace(s, rng, cfg)
@@ -49,7 +49,7 @@ func TestVoltageIntoReactorWallDamagesWhenNoDemand(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 5, R: 2},
+		Pos:  hex.Coord{Q: 5, R: 3},
 		Dir:  hex.RotW.TravelDir(),
 	}}
 

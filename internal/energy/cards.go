@@ -21,7 +21,7 @@ type Card struct {
 var Cards = []Card{
 	{
 		ID: "eroeffnungsfeier", Name: "Eröffnungsfeier", Level: 1,
-		SpecialRule: "Nur neu: Generatoren starten mit 1 Ladung weniger",
+		SpecialRule: "Nur show: Generatoren kosten 1 Chip weniger",
 		Shifts: [5]board.ShiftDemands{
 			{Industry: 1, Residential: 0, Rail: 0, Plant: 1},
 			{Industry: 1, Residential: 1, Rail: 0, Plant: 1},

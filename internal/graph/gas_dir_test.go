@@ -11,7 +11,7 @@ import (
 
 func TestGasBoilerPotentialSixDirections(t *testing.T) {
 	s := board.NewEmpty()
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 2, R: 2}
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 
 	potential := graph.BuildPotential(s)
@@ -26,7 +26,7 @@ func TestGasBoilerPotentialSixDirections(t *testing.T) {
 
 func TestGasBoilerFlowShowsAllDiceEdges(t *testing.T) {
 	s := board.NewEmpty()
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 2, R: 2}
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 
 	// Only two directions rolled, but graph should show all six dice edges.

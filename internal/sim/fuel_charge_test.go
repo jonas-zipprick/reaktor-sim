@@ -11,7 +11,7 @@ import (
 )
 
 func TestGasBoilerPartialChargeConsumesAll(t *testing.T) {
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 1, R: 2}
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 	s.Tiles[pos.Q][pos.R].Charge = 2
@@ -19,7 +19,7 @@ func TestGasBoilerPartialChargeConsumesAll(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 0, R: 1},
+		Pos:  hex.Coord{Q: 0, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 
@@ -44,14 +44,14 @@ func TestGasBoilerPartialChargeConsumesAll(t *testing.T) {
 }
 
 func TestGasBoilerEachReactionReducesCharge(t *testing.T) {
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 1, R: 2}
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 0, R: 1},
+		Pos:  hex.Coord{Q: 0, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 

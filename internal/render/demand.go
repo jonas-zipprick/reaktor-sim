@@ -70,7 +70,7 @@ func industryDemandAnchor(ly layout) image.Point {
 }
 
 func residentialDemandAnchor(ly layout) image.Point {
-	cells := []hex.Coord{{Q: 8, R: 0}, {Q: 8, R: 1}, {Q: 8, R: 2}}
+	cells := []hex.Coord{{Q: 8, R: 2}, {Q: 8, R: 3}}
 	var sumY, maxX int
 	n := 0
 	for _, c := range cells {
@@ -91,7 +91,7 @@ func residentialDemandAnchor(ly layout) image.Point {
 }
 
 func railDemandAnchor(ly layout) image.Point {
-	return anchorBelow(ly, []hex.Coord{{Q: 5, R: 2}, {Q: 6, R: 2}, {Q: 7, R: 2}})
+	return anchorBelow(ly, []hex.Coord{{Q: 5, R: 4}, {Q: 6, R: 4}, {Q: 7, R: 4}})
 }
 
 func plantDemandAnchor(ly layout) image.Point {

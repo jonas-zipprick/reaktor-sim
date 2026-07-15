@@ -117,5 +117,5 @@ func (t *Tile) Cost() int {
 
 // HasRotation reports whether a placed field's facing affects simulation.
 func HasRotation(t Type) bool {
-	return t == Mirror || t == Relay || t == Superconductor
+	return t == Mirror || t == Relay || t == CoolingTower || t == Ground || t == Superconductor
 }

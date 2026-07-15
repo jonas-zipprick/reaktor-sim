@@ -13,7 +13,7 @@ import (
 
 func TestTraceNarrativeCoalReaction(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][1] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[1][2] = field.NewTile(field.CoalChamber, 0, 0)
 
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
@@ -56,7 +56,7 @@ func TestZuenderTrefferNarrative(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 1, R: 1},
+		Pos:  hex.Coord{Q: 1, R: 2},
 		Dir:  hex.RotW.TravelDir(),
 	}}
 

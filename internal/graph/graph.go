@@ -47,7 +47,7 @@ func addShootEdges(node *Node, heat, neutron, voltage float64) {
 	c := node.Coord
 	p := 1.0 / float64(len(hex.ShootRotations))
 	for _, rot := range hex.ShootRotations {
-		next := c.Neighbor(rot.TravelDir())
+		next := c.StepTarget(rot.TravelDir())
 		if hex.CanEnter(c, next) {
 			node.Edges = append(node.Edges, Edge{
 				To:      next,
@@ -138,6 +138,13 @@ func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOu
 	case field.GasBoiler:
 		return emitterOut(c, 4, 1, 0, tile.Charge > 0)
 	case field.CoolingTower:
+		if tile.Orientation.ParallelToAxis(incomingDir) {
+			outDir := hex.PassThroughDir(incomingDir)
+			next := c.Neighbor(outDir)
+			if hex.CanEnter(c, next) {
+				return []rawOut{{to: next, heat: 1}}
+			}
+		}
 		return absorb()
 	case field.AbsorberRod:
 		return absorbNeutron()
@@ -156,6 +163,13 @@ func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOu
 	case field.Transformer:
 		return emitterOut(c, 0, 0, 2, tile.Charge > 0)
 	case field.Ground:
+		if tile.Orientation.ParallelToAxis(incomingDir) {
+			outDir := hex.PassThroughDir(incomingDir)
+			next := c.Neighbor(outDir)
+			if hex.CanEnter(c, next) {
+				return []rawOut{{to: next, voltage: 1}}
+			}
+		}
 		return absorbVoltage()
 	case field.HVCascade:
 		return emitterOut(c, 0, 0, 4, tile.Charge > 0)

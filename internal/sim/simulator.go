@@ -76,6 +76,7 @@ type Config struct {
 	ReactorRepairBudget  int  // max money for igniter repair per run (1 per chip); 0 = none
 	RepairBudget         int  // max money for grid damage repair per run (1 per chip); 0 = none
 	Trace                bool
+	TraceStep            func(Snapshot) error // if set, snapshots are streamed and not retained
 	InitialChips  []Chip
 }
 
@@ -285,7 +286,11 @@ func (e *engine) recordWithActive(event string, active *Chip) {
 	} else {
 		narrative = narrate(event, nil, e.board, queue, nil)
 	}
-	e.trace = append(e.trace, Snapshot{
+	e.emitTraceSnapshot(event, narrative, queue, activeCopy)
+}
+
+func (e *engine) emitTraceSnapshot(event, narrative string, queue []Chip, activeCopy *Chip) {
+	snap := Snapshot{
 		Step:      e.step,
 		Event:     event,
 		Narrative: narrative,
@@ -294,7 +299,12 @@ func (e *engine) recordWithActive(event string, active *Chip) {
 		Queue:     queue,
 		Active:    activeCopy,
 		QueueSize: len(e.queue),
-	})
+	}
+	if e.cfg.TraceStep != nil {
+		_ = e.cfg.TraceStep(snap)
+		return
+	}
+	e.trace = append(e.trace, snap)
 }
 
 func (e *engine) recordStep(event string, active *Chip) {
@@ -377,7 +387,7 @@ func (e *engine) resolve(chip Chip) {
 		return
 	}
 
-	nextPos := chip.Pos.Neighbor(chip.Dir)
+	nextPos := chip.Pos.StepTarget(chip.Dir)
 
 	if nextPos.IsEmitter() {
 		e.board.AddEmitterDamage()
@@ -506,7 +516,7 @@ func (e *engine) reflectOffWall(pos hex.Coord, dir int) int {
 func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
 	switch kind {
 	case hex.BoundaryInternalWall:
-		// The reactor wall (rows 0/2) is the Reaktoreigenbedarf border. Spannung
+		// The reactor wall (rows 1/3) is the Reaktoreigenbedarf border. Spannung
 		// can never enter player 1: it vanishes and reduces plant demand, or
 		// damages the plant zone when no demand is left.
 		if chip.Type == ChipVoltage && chip.Pos.IsPlayer2() {
@@ -781,6 +791,10 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 			return passThrough(chip, pos), false
 		}
 		if chip.Type == ChipHeat {
+			if tile.Orientation.ParallelToAxis(incoming) {
+				out := hex.PassThroughDir(incoming)
+				return []Chip{{Type: chip.Type, Pos: pos, Dir: out}}, false
+			}
 			return nil, false
 		}
 		return passThrough(chip, pos), false
@@ -836,6 +850,10 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 	case field.Ground:
 		if chip.Type != ChipVoltage {
 			return passThrough(chip, pos), false
+		}
+		if tile.Orientation.ParallelToAxis(incoming) {
+			out := hex.PassThroughDir(incoming)
+			return []Chip{{Type: chip.Type, Pos: pos, Dir: out}}, false
 		}
 		return nil, false
 

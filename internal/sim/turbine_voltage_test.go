@@ -16,7 +16,7 @@ func TestVoltageAtTurbineConsumesPlantDemand(t *testing.T) {
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 5, R: 2},
-		Dir:  hex.RotNW.TravelDir(),
+		Dir:  hex.RotW.TravelDir(),
 	}}
 
 	res := sim.Run(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)

@@ -60,9 +60,6 @@ func (m Month) InitialCharge(t field.Type) int {
 		return info.InitialCharge
 	}
 	charge := info.InitialCharge
-	if m.EnergyID == "eroeffnungsfeier" && t == field.EmergencyGenerator {
-		charge--
-	}
 	if m.EnergyID == "gossnab" && (t == field.CoalChamber || t == field.Transformer) {
 		charge--
 	}

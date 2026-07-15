@@ -4,7 +4,7 @@ Monte-Carlo-Simulation für **Reaktor-Architekten** zur Optimierung des Game-Bal
 
 ## Ablauf
 
-1. **Zufälliger Game State** – Felder werden auf dem Hex-Raster platziert (9 Spalten × 3 Zeilen, siehe `gameRules.md`).
+1. **Zufälliger Game State** – Felder werden auf dem Hex-Raster platziert (9 Spalten × 5 Zeilen, siehe `gameRules.md`).
 2. **Graph** – Aus dem Board werden Knoten (Felder) und gerichtete Kanten mit drei Übergangswahrscheinlichkeiten erzeugt: Wärme, Neutron, Spannung.
 3. **Simulation** – Monte-Carlo-Durchläufe starten mit Wärme am Zünder; Chips bewegen sich, Felder reagieren und können ausbrennen (Graph wird neu berechnet).
 4. **Charts** – PNG-Histogramme für Kosten, Wärme an der Turbine und Spannung pro Bedarfszone.

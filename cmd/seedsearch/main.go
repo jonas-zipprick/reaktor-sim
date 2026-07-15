@@ -32,6 +32,11 @@ func main() {
 	financeID := flag.String("finanz-karte", finance.DefaultCard().ID, "Finanz-Karte (Schicht-Budget): "+financeCardIDs())
 	shifts := flag.Int("schichten", 1, "Anzahl aufeinanderfolgender Schichten (1-5, ganzer Monat = 5)")
 	shiftKeep := flag.Int("schicht-keep", 1, "Top-Boards je Rangliste, die in die naechste Schicht weiterverzweigt werden")
+	workers := flag.Int("workers", 0, "Parallele Scan-Worker (0 = GOMAXPROCS)")
+	topSims := flag.Bool("top-sims", true, "Top-Sim-Ordner mit Trace-Grafiken exportieren")
+	tracePNG := flag.Bool("trace-png", true, "Schritt-PNGs in Top-Sim-Traces schreiben")
+	topSimCharts := flag.Bool("top-sim-charts", false, "Zusatz-Charts je Top-Sim (fuehrt Monte-Carlo erneut aus)")
+	outFull := flag.Bool("out-full", false, "YAML enthaelt alle Outcomes (sonst nur Top-Listen)")
 	monthFilter := flag.Int("month-filter", 0, "Kampagnenmonat: nur dann verfuegbare Felder kaufen (0 = alle)")
 	startBoard := flag.String("start-board", "", "Board-Fingerprint als Startbrett (Folgemonat: Kaufvarianten statt Neugenerierung)")
 	flag.Parse()
@@ -53,6 +58,9 @@ func main() {
 	}
 	if *shiftKeep < 1 {
 		log.Fatal("-schicht-keep muss >= 1 sein")
+	}
+	if *workers < 0 {
+		log.Fatal("-workers muss >= 0 sein")
 	}
 	if *monthFilter < 0 {
 		log.Fatal("-month-filter muss >= 0 sein")
@@ -78,8 +86,13 @@ func main() {
 		Finance:               financeCard,
 		Shifts:                *shifts,
 		ShiftKeep:             *shiftKeep,
+		Workers:               *workers,
 		MonthFilter:           *monthFilter,
 		StartBoardFingerprint: *startBoard,
+	}
+	export := simExportOptions{
+		tracePNGs:    *tracePNG,
+		topSimCharts: *topSimCharts,
 	}
 
 	total := *to - *from + 1
@@ -139,24 +152,26 @@ func main() {
 	}
 
 	if *chartsDir != "" {
-		if err := os.RemoveAll(*chartsDir); err != nil {
-			log.Fatalf("Ausgabeverzeichnis leeren: %v", err)
+		if err := prepareChartsDir(*chartsDir); err != nil {
+			log.Fatalf("Ausgabeverzeichnis vorbereiten: %v", err)
 		}
 		if err := writeCharts(*chartsDir, scan, *runs); err != nil {
 			log.Fatal(err)
 		}
-		if err := writeTopSims(*chartsDir, scan, energyCard, financeCard, *runs, *shiftKeep); err != nil {
-			log.Fatal(err)
+		if *topSims {
+			if err := writeTopSims(*chartsDir, scan, energyCard, financeCard, *runs, *shiftKeep, export); err != nil {
+				log.Fatal(err)
+			}
 		}
 		fmt.Fprintf(out, "Charts: %s/\n", *chartsDir)
-		if len(scan.Shifts) > 0 {
+		if *topSims && len(scan.Shifts) > 0 {
 			last := scan.Shifts[len(scan.Shifts)-1].Shift
 			fmt.Fprintf(out, "Top-Sims: %s/top_sims_schicht_%d/\n", *chartsDir, last)
 		}
 	}
 
 	if *outFile != "" {
-		if err := writeYAML(*outFile, scan, opts, *from, *to, *top); err != nil {
+		if err := writeYAML(*outFile, scan, opts, *from, *to, *top, *outFull); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Fprintf(out, "\nVollstaendige Ergebnisse: %s\n", *outFile)
@@ -200,6 +215,22 @@ func printShiftBlock(w io.Writer, sr seedsearch.ShiftResult, card energy.Card, t
 	printTable(w, "Top Seeds: Max. 1 Bedarf nicht erfuellt und kein Schaden", seedsearch.TopMax1DemandNoDamage(o, top), runs, max1DemandNoDamageCols)
 	printTable(w, "Top Seeds: Max. 1 Bedarf nicht erfuellt und maximal 1 Schaden", seedsearch.TopMax1DemandMax1Damage(o, top), runs, max1DemandMax1DamageCols)
 	printTable(w, "Top Seeds nach Loops (Schrittlimit)", seedsearch.TopLoops(o, top), runs, loopCols)
+}
+
+func prepareChartsDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		if err := os.RemoveAll(filepath.Join(dir, e.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeCharts(dir string, scan seedsearch.ScanResult, runs int) error {
@@ -420,7 +451,7 @@ type outcomeYAML struct {
 	LoopRate             float64        `yaml:"loop_rate"`
 }
 
-func writeYAML(path string, scan seedsearch.ScanResult, opts seedsearch.Options, from, to int64, top int) error {
+func writeYAML(path string, scan seedsearch.ScanResult, opts seedsearch.Options, from, to int64, top int, fullOutcomes bool) error {
 	doc := reportYAML{
 		From: from,
 		To:   to,
@@ -438,16 +469,19 @@ func writeYAML(path string, scan seedsearch.ScanResult, opts seedsearch.Options,
 		},
 	}
 	for _, sr := range scan.Shifts {
-		doc.Shifts = append(doc.Shifts, shiftYAML{
+		entry := shiftYAML{
 			Shift:                   sr.Shift,
 			Demand:                  shiftDemandsYAML(opts.EnergyCard.ShiftDemands(sr.Shift)),
-			Outcomes:                toOutcomeYAML(sr.Outcomes),
 			TopWins:                 toOutcomeYAML(seedsearch.TopWins(sr.Outcomes, top)),
 			TopAllDemandsNoDamage:   toOutcomeYAML(seedsearch.TopAllDemandsNoDamage(sr.Outcomes, top)),
 			TopMax1DemandNoDamage:   toOutcomeYAML(seedsearch.TopMax1DemandNoDamage(sr.Outcomes, top)),
 			TopMax1DemandMax1Damage: toOutcomeYAML(seedsearch.TopMax1DemandMax1Damage(sr.Outcomes, top)),
 			TopLoops:                toOutcomeYAML(seedsearch.TopLoops(sr.Outcomes, top)),
-		})
+		}
+		if fullOutcomes {
+			entry.Outcomes = toOutcomeYAML(sr.Outcomes)
+		}
+		doc.Shifts = append(doc.Shifts, entry)
 	}
 	data, err := yaml.Marshal(doc)
 	if err != nil {

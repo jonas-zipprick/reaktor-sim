@@ -152,7 +152,7 @@ func addFlowChip(g *Graph, chip InFlight) {
 }
 
 func flowTarget(from hex.Coord, dir int, particle ParticleType) (hex.Coord, bool) {
-	next := from.Neighbor(dir)
+	next := from.StepTarget(dir)
 	if hex.CanEnter(from, next) {
 		return next, true
 	}

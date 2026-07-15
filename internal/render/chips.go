@@ -28,12 +28,12 @@ func LooseCountsAt(view ChipView, c hex.Coord) LooseCounts {
 		if chip.Pos == c {
 			addOn(&r, chip.Type)
 		}
-		if chip.Pos.Neighbor(chip.Dir) == c {
+		if chip.Pos.StepTarget(chip.Dir) == c {
 			addIn(&r, chip.Type)
 		}
 	}
 	if view.Active != nil && !chipInQueue(view.Queue, *view.Active) {
-		if view.Active.Pos.Neighbor(view.Active.Dir) == c {
+		if view.Active.Pos.StepTarget(view.Active.Dir) == c {
 			addIn(&r, view.Active.Type)
 		}
 	}

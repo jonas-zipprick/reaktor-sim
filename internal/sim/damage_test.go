@@ -14,7 +14,7 @@ func TestVoltageWallDamageWhenNoDemand(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 8, R: 1},
+		Pos:  hex.Coord{Q: 8, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 
@@ -38,7 +38,7 @@ func TestVoltageAtTurbineDamagesWhenPlantEmpty(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 5, R: 2},
+		Pos:  hex.Coord{Q: 5, R: 4},
 		Dir:  hex.RotNW.TravelDir(),
 	}}
 

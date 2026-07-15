@@ -65,15 +65,15 @@ func ZonesOf(c hex.Coord) []Zone {
 		return nil
 	}
 	switch {
-	case c.Q == 8:
+	case c.Q == 8 && (c.R == 2 || c.R == 3):
 		return []Zone{ZoneResidential}
 	case c.R == 0 && c.Q == 5:
 		return []Zone{ZoneIndustry, ZonePlant}
 	case c.R == 0 && (c.Q == 6 || c.Q == 7):
 		return []Zone{ZoneIndustry}
-	case c.R == 2 && c.Q == 5:
+	case c.R == hex.Rows-1 && c.Q == 5:
 		return []Zone{ZoneRail, ZonePlant}
-	case c.R == 2 && (c.Q == 6 || c.Q == 7):
+	case c.R == hex.Rows-1 && (c.Q == 6 || c.Q == 7):
 		return []Zone{ZoneRail}
 	default:
 		return nil

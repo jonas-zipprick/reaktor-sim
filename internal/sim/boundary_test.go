@@ -42,7 +42,7 @@ func TestHeatReflectionNWToSE(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 1, R: 0},
+		Pos:  hex.Coord{Q: 2, R: 0},
 		Dir:  hex.RotNW.TravelDir(),
 	}}
 
@@ -64,7 +64,7 @@ func TestVoltageDeliveryConsumesDemand(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 8, R: 0},
+		Pos:  hex.Coord{Q: 8, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 
@@ -79,7 +79,7 @@ func TestHeatAtInternalWallConvertsAtTurbine(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 4, R: 0},
+		Pos:  hex.Coord{Q: 3, R: 1},
 		Dir:  0, // east into reactor wall above turbine
 	}}
 
@@ -107,7 +107,7 @@ func TestHeatAtLowerInternalWallConvertsAtTurbine(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 4, R: 2},
+		Pos:  hex.Coord{Q: 3, R: 3},
 		Dir:  0,
 	}}
 
@@ -122,7 +122,7 @@ func TestVoltageSEDoesNotConsumePlantDemand(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 8, R: 1},
+		Pos:  hex.Coord{Q: 8, R: 2},
 		Dir:  hex.RotSE.TravelDir(),
 	}}
 
@@ -164,7 +164,7 @@ func TestDemandDecrementsOnWallDelivery(t *testing.T) {
 		t.Fatalf("expected 2 residential demands, got %d", s.TotalDemand(board.ZoneResidential))
 	}
 	rng := rand.New(rand.NewSource(6))
-	_, ok := s.TryConsumeWallDemand(hex.Coord{Q: 8, R: 1}, hex.RotE.TravelDir(), rng)
+	_, ok := s.TryConsumeWallDemand(hex.Coord{Q: 8, R: 2}, hex.RotE.TravelDir(), rng)
 	if !ok {
 		t.Fatal("expected demand consumption")
 	}

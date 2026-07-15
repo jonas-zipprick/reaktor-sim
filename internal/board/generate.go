@@ -295,7 +295,8 @@ func (p *costPlanner) validChoices(slotIdx, remaining int) []field.Type {
 }
 
 func marketFor(c hex.Coord, monthFilter int) []field.Type {
-	return field.FilterMarket(marketForPlayer(c.IsPlayer1()), monthFilter)
+	types := field.FilterMarket(marketForPlayer(c.IsPlayer1()), monthFilter)
+	return field.FilterForCell(types, c)
 }
 
 func marketForPlayer(player1 bool) []field.Type {
@@ -325,12 +326,15 @@ func placeTile(s *State, c hex.Coord, t field.Type, rng *rand.Rand, month rules.
 		s.Tiles[c.Q][c.R] = field.Tile{Type: field.Empty}
 		return
 	}
+	if !field.AllowedOnCell(t, c) {
+		return
+	}
 	superTarget := hex.Rotation(0)
 	orient := hex.Rotation(0)
 	if t == field.Superconductor {
 		superTarget = hex.RandomRotation(rng)
 	}
-	if t == field.Relay || t == field.Mirror {
+	if t == field.Relay || t == field.Mirror || t == field.CoolingTower || t == field.Ground {
 		orient = hex.RandomRotation(rng)
 	}
 	s.Tiles[c.Q][c.R] = field.NewTile(t, orient, superTarget)

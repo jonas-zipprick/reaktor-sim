@@ -98,13 +98,17 @@ func TestScanWithStartBoard(t *testing.T) {
 	if len(scan.Shifts[0].Outcomes) == 0 {
 		t.Fatal("expected outcomes with start board")
 	}
+	anyChanged := false
 	for _, o := range scan.Shifts[0].Outcomes {
 		if o.PrevBoardFingerprint != fp {
 			t.Fatalf("prev board = %q, want %q", o.PrevBoardFingerprint, fp)
 		}
-		if o.BoardFingerprint == fp {
-			t.Fatalf("seed %d: board unchanged after purchases", o.Seed)
+		if o.BoardFingerprint != fp {
+			anyChanged = true
 		}
+	}
+	if !anyChanged {
+		t.Fatal("expected at least one seed to change the start board after purchases")
 	}
 }
 

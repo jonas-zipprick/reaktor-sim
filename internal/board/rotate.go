@@ -11,7 +11,7 @@ const shiftRotationLikelihood = 0.5
 
 // ApplyRandomShiftRotations reorients already placed fields at shift start (phase 2
 // in gameRules.md). Each orientable field is rotated independently with
-// shiftRotationLikelihood; mirrors, relays, and superconductors pick a new facing.
+// shiftRotationLikelihood; mirrors, relays, cooling towers, and superconductors pick a new facing.
 func ApplyRandomShiftRotations(rng *rand.Rand, s *State) {
 	for _, c := range PlaceableSlots() {
 		t := s.tileAt(c)
@@ -30,7 +30,7 @@ func ApplyRandomShiftRotations(rng *rand.Rand, s *State) {
 
 func rotateTile(t *field.Tile, rng *rand.Rand) {
 	switch t.Type {
-	case field.Mirror, field.Relay:
+	case field.Mirror, field.Relay, field.CoolingTower, field.Ground:
 		t.Orientation = randomDifferentRotation(rng, t.Orientation)
 	case field.Superconductor:
 		t.SuperTarget = randomDifferentRotation(rng, t.SuperTarget)

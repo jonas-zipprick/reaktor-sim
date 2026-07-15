@@ -15,7 +15,7 @@ func TestIgniterDestroysChip(t *testing.T) {
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 1, R: 1},
+		Pos:  hex.Coord{Q: 1, R: 2},
 		Dir:  hex.RotW.TravelDir(),
 	}}
 

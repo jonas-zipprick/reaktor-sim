@@ -1,19 +1,19 @@
-// Package hex provides coordinates for the 9-column, 3-row hex board.
+// Package hex provides coordinates for the 9-column, 5-row hex board.
 package hex
 
 // Board dimensions from gameRules.md "Das Spielfeld im Detail".
 const (
 	Cols = 9
-	Rows = 3
+	Rows = 5
 
 	// Column indices (0-based). Columns 1–5 are player 1, 6–9 are player 2.
 	Player1MaxCol = 4
 	Player2MinCol = 5
 
 	EmitterCol = 0
-	EmitterRow = 1
+	EmitterRow = 2
 	TurbineCol = 4
-	TurbineRow = 1
+	TurbineRow = 2
 )
 
 // Coord is an odd-r offset hex (pointy-top). Q = column, R = row.
@@ -34,7 +34,7 @@ const (
 
 // AllBoardCoords lists every in-bounds hex in row-major order.
 var AllBoardCoords = func() []Coord {
-	out := make([]Coord, 0, 25)
+	out := make([]Coord, 0, 40)
 	for r := 0; r < Rows; r++ {
 		for q := 0; q < Cols; q++ {
 			c := Coord{Q: q, R: r}
@@ -50,8 +50,20 @@ func (c Coord) Valid() bool {
 	if c.R < 0 || c.R >= Rows || c.Q < 0 || c.Q >= Cols {
 		return false
 	}
-	// Top-left and bottom-left corners are out of bounds.
-	if c.Q == 0 && (c.R == 0 || c.R == 2) {
+	// Left column is out of bounds except for the emitter (Zünder).
+	if c.Q == 0 && c.R != EmitterRow {
+		return false
+	}
+	// Column 2 is out of bounds on the top and bottom extension rows.
+	if c.Q == 1 && (c.R == 0 || c.R == Rows-1) {
+		return false
+	}
+	// Center column is out of bounds on the top and bottom extension rows.
+	if c.Q == TurbineCol && (c.R == 0 || c.R == Rows-1) {
+		return false
+	}
+	// Right column has no slots on the top and bottom extension rows.
+	if c.Q == Cols-1 && (c.R == 0 || c.R == Rows-1) {
 		return false
 	}
 	return true
@@ -92,12 +104,12 @@ func (c Coord) IsPlayer2() bool {
 }
 
 // wallRow reports whether the fixed player-1/player-2 wall exists in row r.
-// Row 1 holds the turbine interface, so it is open.
+// Row 2 holds the turbine interface, so it is open.
 func wallRow(r int) bool {
-	return r == 0 || r == 2
+	return r == 1 || r == 3
 }
 
-// HasWallRight is true for player-1 cells with a fixed wall to player 2 (rows 0 and 2).
+// HasWallRight is true for player-1 cells with a fixed wall to player 2 (rows 1 and 3).
 func (c Coord) HasWallRight() bool {
 	return c.Q == Player1MaxCol && wallRow(c.R)
 }
@@ -115,13 +127,39 @@ func (c Coord) WallBlocksWest() bool {
 
 // oddRNeighborDeltas are pointy-top odd-r offsets (E, NE, NW, W, SW, SE).
 var oddRNeighborDeltas = [2][6][2]int{
-	{{1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}, {0, 1}},  // even row
-	{{1, 0}, {1, -1}, {0, -1}, {-1, 0}, {0, 1}, {1, 1}},     // odd row
+	{{1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, 1}, {0, 1}}, // even row
+	{{1, 0}, {1, -1}, {0, -1}, {-1, 0}, {0, 1}, {1, 1}},   // odd row
 }
 
 func (c Coord) Neighbor(dir int) Coord {
 	d := oddRNeighborDeltas[c.R&1][dir%6]
 	return Coord{Q: c.Q + d[0], R: c.R + d[1]}
+}
+
+// EmitterShotTarget returns the first hex entered when the igniter fires in dir.
+// On the 5-row board the Zünder sits on an even row where NE/SE hex neighbors are
+// out-of-bounds; gameRules still allow shots into the three reactor slots beside it.
+func EmitterShotTarget(dir int) Coord {
+	switch Rotation(DisplayDir(dir % 6)) {
+	case RotNE:
+		return Coord{Q: 1, R: EmitterRow - 1}
+	case RotE:
+		return Coord{Q: 1, R: EmitterRow}
+	case RotSE:
+		return Coord{Q: 1, R: EmitterRow + 1}
+	default:
+		return Coord{Q: -1, R: -1}
+	}
+}
+
+// StepTarget is the next cell for a chip at c moving in dir.
+func (c Coord) StepTarget(dir int) Coord {
+	if c.IsEmitter() {
+		if t := EmitterShotTarget(dir); t.Valid() {
+			return t
+		}
+	}
+	return c.Neighbor(dir)
 }
 
 // ReflectDirection mirrors a chip off a wall.

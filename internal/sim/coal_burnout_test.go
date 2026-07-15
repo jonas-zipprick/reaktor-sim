@@ -18,14 +18,14 @@ func TestCoalChamberStartsWithFourCharge(t *testing.T) {
 }
 
 func TestBurnedCoalRedirectsHeat(t *testing.T) {
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 1, R: 2}
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.CoalChamber, BurnedOut: true}
 
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 0, R: 1},
+		Pos:  hex.Coord{Q: 0, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 
@@ -44,14 +44,14 @@ func TestBurnedCoalRedirectsHeat(t *testing.T) {
 }
 
 func TestBurnedCoalStillDestroysNeutron(t *testing.T) {
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 1, R: 2}
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.CoalChamber, BurnedOut: true}
 
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipNeutron,
-		Pos:  hex.Coord{Q: 0, R: 1},
+		Pos:  hex.Coord{Q: 0, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 

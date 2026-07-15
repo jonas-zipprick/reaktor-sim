@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -34,20 +35,33 @@ func TestLinkToPrevShift(t *testing.T) {
 	if err := linkToPrevShift(cur, prev); err != nil {
 		t.Fatal(err)
 	}
-	linkPath := filepath.Join(cur, "vorschicht")
-	target, err := os.Readlink(linkPath)
+
+	linkPath := filepath.Join(cur, prevShiftLinkName)
+	prevAbs, err := filepath.Abs(prev)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join("..", filepath.Base(prev))
-	if target != want {
-		t.Fatalf("symlink target = %q, want %q", target, want)
-	}
-	resolved, err := filepath.EvalSymlinks(linkPath)
+
+	resolved, err := resolvePrevShiftDir(linkPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resolved != prev {
-		t.Fatalf("resolved = %q, want %q", resolved, prev)
+	resolvedAbs, err := filepath.Abs(resolved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolvedAbs != prevAbs {
+		t.Fatalf("resolved = %q, want %q", resolvedAbs, prevAbs)
+	}
+
+	if runtime.GOOS != "windows" {
+		target, err := os.Readlink(linkPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := filepath.Join("..", filepath.Base(prev))
+		if target != want {
+			t.Fatalf("symlink target = %q, want %q", target, want)
+		}
 	}
 }

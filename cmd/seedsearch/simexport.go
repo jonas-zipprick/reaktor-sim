@@ -16,6 +16,11 @@ import (
 	"github.com/jonas/reaktor-sim/internal/stats"
 )
 
+type simExportOptions struct {
+	tracePNGs    bool
+	topSimCharts bool
+}
+
 type topTable struct {
 	slug string
 	pick func([]seedsearch.Outcome, int) []seedsearch.Outcome
@@ -29,7 +34,7 @@ var topTables = []topTable{
 	{"top_loops", seedsearch.TopLoops},
 }
 
-func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, fin finance.Card, runs, keep int) error {
+func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, fin finance.Card, runs, keep int, export simExportOptions) error {
 	if len(scan.Shifts) == 0 {
 		return nil
 	}
@@ -57,7 +62,7 @@ func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, fin 
 			}
 			for _, o := range chain {
 				outDir := filepath.Join(tableDir, seedsearch.ShiftDirName(o))
-				if err := writeSimExport(outDir, o, chain[:o.Shift], card, fin, runs); err != nil {
+				if err := writeSimExport(outDir, o, chain[:o.Shift], card, fin, runs, export); err != nil {
 					return fmt.Errorf("%s %s: %w", tbl.slug, seedsearch.ShiftDirName(o), err)
 				}
 				boardDirs.register(o.Shift, o.BoardFingerprint, outDir)
@@ -76,14 +81,14 @@ func writeTopSims(dir string, scan seedsearch.ScanResult, card energy.Card, fin 
 				continue
 			}
 			if err := linkToPrevShift(p.outDir, prevDir); err != nil {
-				return fmt.Errorf("%s: vorschicht symlink (prev %s): %w", tbl.slug, p.prevFP, err)
+				return fmt.Errorf("%s: vorschicht link (prev %s): %w", tbl.slug, p.prevFP, err)
 			}
 		}
 	}
 	return nil
 }
 
-func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearch.Outcome, card energy.Card, fin finance.Card, runs int) error {
+func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearch.Outcome, card energy.Card, fin finance.Card, runs int, export simExportOptions) error {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return err
 	}
@@ -111,74 +116,78 @@ func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearc
 	previewChips := sim.EmitterChips(preview, cfg, rng)
 
 	traceCosts := state.PlayerCosts()
-	traceRNG := rand.New(rand.NewSource(o.Seed + 1))
-	res, snaps := sim.RunTrace(state, traceRNG, cfg)
-	meta := render.TraceMeta{
-		Shift: res.Shift,
+	traceMeta := render.TraceMeta{
+		Shift: o.Shift,
 		Costs: traceCosts,
 	}
+
 	var traceIndex []render.TraceIndexEntry
-	if err := render.WriteRunTrace(1, meta, snaps, outDir); err != nil {
-		return fmt.Errorf("trace run1: %w", err)
-	}
-	runDir, _ := filepath.Abs(filepath.Join(outDir, "run1"))
-	traceIndex = append(traceIndex, render.TraceIndexEntry{
-		Run:   1,
-		Kind:  render.TraceKindFirst,
-		Steps: len(snaps),
-		Dir:   runDir,
-	})
-
-	results := sim.RunMonteCarlo(state, runs, o.Seed, cfg)
-	report := stats.Build(state.PlayerCosts(), o.EndLeftover, results)
-	if len(chainPrefix) > 1 {
-		cm := seedsearch.CampaignMoneyFromChain(chainPrefix, fin)
-		report.Campaign = &cm
-	}
-
-	for loopNum, mcRun := range sim.LoopTraceRunIndices(results, 1) {
-		loopRNG := rand.New(rand.NewSource(o.Seed + int64(mcRun)))
-		loopRes, loopSnaps := sim.RunTrace(state, loopRNG, cfg)
-		loopMeta := render.TraceMeta{
-			Shift: loopRes.Shift,
-			Costs: traceCosts,
+	if export.tracePNGs {
+		traceRNG := rand.New(rand.NewSource(o.Seed + 1))
+		runWriter, err := render.NewRunTraceStreamWriter(outDir, 1, traceMeta)
+		if err != nil {
+			return err
 		}
-		seq := loopNum + 1
-		if err := render.WriteLoopTrace(seq, mcRun, loopMeta, loopSnaps, outDir); err != nil {
-			return fmt.Errorf("trace loop%d (MC %d): %w", seq, mcRun, err)
+		cfg.Trace = true
+		cfg.TraceStep = runWriter.Record
+		sim.RunTrace(state, traceRNG, cfg)
+		if err := runWriter.Finish(); err != nil {
+			return fmt.Errorf("trace run1: %w", err)
 		}
-		loopDir, _ := filepath.Abs(filepath.Join(outDir, fmt.Sprintf("loop%d", seq)))
 		traceIndex = append(traceIndex, render.TraceIndexEntry{
-			Run:           seq,
-			MonteCarloRun: mcRun,
-			Kind:          render.TraceKindLoop,
-			Steps:         len(loopSnaps),
-			Dir:           loopDir,
+			Run:   1,
+			Kind:  render.TraceKindFirst,
+			Steps: runWriter.Steps(),
+			Dir:   runWriter.Dir(),
 		})
+
+		if o.TraceLoopRun > 0 {
+			loopWriter, err := render.NewLoopTraceStreamWriter(outDir, 1, o.TraceLoopRun, traceMeta)
+			if err != nil {
+				return err
+			}
+			loopCfg := cfg
+			loopCfg.TraceStep = loopWriter.Record
+			loopRNG := rand.New(rand.NewSource(o.Seed + int64(o.TraceLoopRun)))
+			sim.RunTrace(state, loopRNG, loopCfg)
+			if err := loopWriter.Finish(); err != nil {
+				return fmt.Errorf("trace loop1 (MC %d): %w", o.TraceLoopRun, err)
+			}
+			traceIndex = append(traceIndex, render.TraceIndexEntry{
+				Run:           1,
+				MonteCarloRun: o.TraceLoopRun,
+				Kind:          render.TraceKindLoop,
+				Steps:         loopWriter.Steps(),
+				Dir:           loopWriter.Dir(),
+			})
+		}
+
+		if o.TraceWinRun > 0 {
+			winWriter, err := render.NewWinTraceStreamWriter(outDir, 1, o.TraceWinRun, traceMeta)
+			if err != nil {
+				return err
+			}
+			winCfg := cfg
+			winCfg.TraceStep = winWriter.Record
+			winRNG := rand.New(rand.NewSource(o.Seed + int64(o.TraceWinRun)))
+			sim.RunTrace(state, winRNG, winCfg)
+			if err := winWriter.Finish(); err != nil {
+				return fmt.Errorf("trace win1 (MC %d): %w", o.TraceWinRun, err)
+			}
+			traceIndex = append(traceIndex, render.TraceIndexEntry{
+				Run:           1,
+				MonteCarloRun: o.TraceWinRun,
+				Kind:          render.TraceKindWin,
+				Steps:         winWriter.Steps(),
+				Dir:           winWriter.Dir(),
+			})
+		}
 	}
 
-	for winNum, mcRun := range sim.WinTraceRunIndices(results, 1) {
-		winRNG := rand.New(rand.NewSource(o.Seed + int64(mcRun)))
-		winRes, winSnaps := sim.RunTrace(state, winRNG, cfg)
-		winMeta := render.TraceMeta{
-			Shift: winRes.Shift,
-			Costs: traceCosts,
+	if len(traceIndex) > 0 {
+		if err := render.WriteTraceIndex(outDir, traceIndex); err != nil {
+			return fmt.Errorf("trace index: %w", err)
 		}
-		seq := winNum + 1
-		if err := render.WriteWinTrace(seq, mcRun, winMeta, winSnaps, outDir); err != nil {
-			return fmt.Errorf("trace win%d (MC %d): %w", seq, mcRun, err)
-		}
-		winDir, _ := filepath.Abs(filepath.Join(outDir, fmt.Sprintf("win%d", seq)))
-		traceIndex = append(traceIndex, render.TraceIndexEntry{
-			Run:           seq,
-			MonteCarloRun: mcRun,
-			Kind:          render.TraceKindWin,
-			Steps:         len(winSnaps),
-			Dir:           winDir,
-		})
-	}
-	if err := render.WriteTraceIndex(outDir, traceIndex); err != nil {
-		return fmt.Errorf("trace index: %w", err)
 	}
 
 	if err := render.WriteAll(preview, outDir, render.ChipView{Queue: previewChips}, render.BoardMeta{
@@ -187,21 +196,19 @@ func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearc
 	}); err != nil {
 		return fmt.Errorf("render: %w", err)
 	}
-	if err := charts.WriteAll(report, outDir); err != nil {
-		return fmt.Errorf("charts: %w", err)
+
+	if export.topSimCharts {
+		results := sim.RunMonteCarlo(state, runs, o.Seed, cfg)
+		report := stats.Build(state.PlayerCosts(), o.EndLeftover, results)
+		if len(chainPrefix) > 1 {
+			cm := seedsearch.CampaignMoneyFromChain(chainPrefix, fin)
+			report.Campaign = &cm
+		}
+		if err := charts.WriteAll(report, outDir); err != nil {
+			return fmt.Errorf("charts: %w", err)
+		}
 	}
 	return nil
-}
-
-// linkToPrevShift creates outDir/vorschicht -> prevOutDir (relative symlink).
-func linkToPrevShift(outDir, prevOutDir string) error {
-	linkPath := filepath.Join(outDir, "vorschicht")
-	_ = os.Remove(linkPath)
-	rel, err := filepath.Rel(outDir, prevOutDir)
-	if err != nil {
-		return err
-	}
-	return os.Symlink(rel, linkPath)
 }
 
 // shiftBoardDirs maps exported shift folders by board fingerprint (prev_board target).

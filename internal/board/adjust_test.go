@@ -11,7 +11,7 @@ func TestSpendShiftBudgetRemovesAndPlaces(t *testing.T) {
 	prev := Random(rand.New(rand.NewSource(42)), 0)
 	unchanged := prev.Clone()
 
-	if _, err := SpendShiftBudget(rand.New(rand.NewSource(7)), prev, 3, 0, 0, rules.Month{}); err != nil {
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(3)), prev, 5, 0, 0, rules.Month{}); err != nil {
 		t.Fatal(err)
 	}
 	if prev.PlayerCosts() == unchanged.PlayerCosts() {

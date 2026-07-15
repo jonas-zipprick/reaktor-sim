@@ -54,6 +54,20 @@ func (r Rotation) ValidShoot() bool {
 	return r == RotNE || r == RotE || r == RotSE
 }
 
+// ParallelToAxis reports whether incoming travel direction is along the
+// through-axis marked by orientation (opposite edges o and o+3).
+func (r Rotation) ParallelToAxis(incoming int) bool {
+	incoming = normalizeRot(incoming)
+	a := r.TravelDir()
+	b := Rotation(normalizeRot(int(r) + 3)).TravelDir()
+	return incoming == a || incoming == b
+}
+
+// PassThroughDir returns outbound travel direction for chips continuing straight through a tile.
+func PassThroughDir(incoming int) int {
+	return (normalizeRot(incoming) + 3) % 6
+}
+
 // WireOutgoing returns the outbound travel direction for a chip crossing a mirror
 // or relay. Orientation marks the open line between opposite edges (o and o+3).
 // Approaches parallel to that line pass through; all others are deflected 60°
@@ -63,7 +77,7 @@ func (r Rotation) WireOutgoing(incoming int) int {
 	parallelA := r.TravelDir()
 	parallelB := Rotation(normalizeRot(int(r) + 3)).TravelDir()
 	if incoming == parallelA || incoming == parallelB {
-		return (incoming + 3) % 6
+		return PassThroughDir(incoming)
 	}
 	prev := (incoming + 5) % 6
 	next := (incoming + 1) % 6

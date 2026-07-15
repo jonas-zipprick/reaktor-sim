@@ -54,10 +54,9 @@ func TestDisplayDirName(t *testing.T) {
 }
 
 func TestEmitterShotSoutheast(t *testing.T) {
-	c := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
-	next := c.Neighbor(hex.RotSE.TravelDir())
-	if next != (hex.Coord{Q: 1, R: 2}) {
-		t.Fatalf("SE from emitter: got (%d,%d) want (1,2)", next.Q, next.R)
+	next := hex.EmitterShotTarget(hex.RotSE.TravelDir())
+	if next != (hex.Coord{Q: 1, R: 3}) {
+		t.Fatalf("SE from emitter: got (%d,%d) want (1,3)", next.Q, next.R)
 	}
 }
 
@@ -87,5 +86,15 @@ func TestRelayOrientation0PassesNorthwestSoutheast(t *testing.T) {
 	}
 	if got := r.WireOutgoing(hex.RotNW.TravelDir()); got != hex.RotSE.TravelDir() {
 		t.Fatalf("NW pass-through: got %s want SE", hex.DisplayDirName(got))
+	}
+}
+
+func TestParallelToAxis(t *testing.T) {
+	r := hex.RotNW
+	if !r.ParallelToAxis(hex.RotSE.TravelDir()) {
+		t.Fatal("SE should be parallel to NW-SE axis")
+	}
+	if r.ParallelToAxis(hex.RotE.TravelDir()) {
+		t.Fatal("E should not be parallel to NW-SE axis")
 	}
 }

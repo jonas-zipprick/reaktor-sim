@@ -36,7 +36,7 @@ func TestLooseLabelIncomingOnly(t *testing.T) {
 
 func TestLooseCountsAtDoesNotDoubleCountActiveInQueue(t *testing.T) {
 	turbine := hex.Coord{Q: hex.TurbineCol, R: hex.TurbineRow}
-	chip := sim.Chip{Type: sim.ChipVoltage, Pos: hex.Coord{Q: 5, R: 2}, Dir: hex.RotNW.TravelDir()}
+	chip := sim.Chip{Type: sim.ChipVoltage, Pos: hex.Coord{Q: 5, R: 2}, Dir: hex.RotW.TravelDir()}
 	view := ChipView{
 		Queue:  []sim.Chip{chip},
 		Active: &chip,

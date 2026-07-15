@@ -35,8 +35,8 @@ func TestFieldCostDiscounts(t *testing.T) {
 
 func TestInitialChargeModifiers(t *testing.T) {
 	eroeff := rules.Month{EnergyID: "eroeffnungsfeier"}
-	if got := eroeff.InitialCharge(field.EmergencyGenerator); got != 1 {
-		t.Fatalf("generator = %d, want 1", got)
+	if got := eroeff.InitialCharge(field.EmergencyGenerator); got != 2 {
+		t.Fatalf("generator = %d, want 2", got)
 	}
 
 	gossnab := rules.Month{EnergyID: "gossnab"}

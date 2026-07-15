@@ -22,9 +22,9 @@ func DefaultShiftDemands() ShiftDemands {
 }
 
 var industryCells = []hex.Coord{{Q: 5, R: 0}, {Q: 6, R: 0}, {Q: 7, R: 0}}
-var railCells = []hex.Coord{{Q: 5, R: 2}, {Q: 6, R: 2}, {Q: 7, R: 2}}
-var residentialCells = []hex.Coord{{Q: 8, R: 0}, {Q: 8, R: 1}, {Q: 8, R: 2}}
-var plantCells = []hex.Coord{{Q: 5, R: 0}, {Q: 5, R: 2}}
+var railCells = []hex.Coord{{Q: 5, R: 4}, {Q: 6, R: 4}, {Q: 7, R: 4}}
+var residentialCells = []hex.Coord{{Q: 8, R: 2}, {Q: 8, R: 3}}
+var plantCells = []hex.Coord{{Q: 5, R: 0}, {Q: 5, R: 4}}
 
 // ApplyDemands adds demand chips on wired border cells for a new shift.
 func (s *State) ApplyDemands(d ShiftDemands) {

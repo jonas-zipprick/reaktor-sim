@@ -11,8 +11,8 @@ import (
 
 func TestBuildFlowStartOnlyEmitterEdge(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][0] = field.NewTile(field.GasBoiler, 0, 0)
-	s.Tiles[2][0] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[2][0] = field.NewTile(field.GasBoiler, 0, 0)
+	s.Tiles[3][0] = field.NewTile(field.CoalChamber, 0, 0)
 
 	flow := graph.BuildFlow(s, []graph.InFlight{{
 		Particle: graph.Heat,
@@ -27,12 +27,12 @@ func TestBuildFlowStartOnlyEmitterEdge(t *testing.T) {
 	if emitter.Edges[0].Heat != 1 {
 		t.Fatalf("emitter edge should be 100%% heat, got %.2f", emitter.Edges[0].Heat)
 	}
-	want := hex.Coord{Q: 1, R: 2}
+	want := hex.Coord{Q: 1, R: 3}
 	if emitter.Edges[0].To != want {
 		t.Fatalf("SE shot should target (%d,%d), got (%d,%d)", want.Q, want.R, emitter.Edges[0].To.Q, emitter.Edges[0].To.R)
 	}
 
-	for _, c := range []hex.Coord{{Q: 1, R: 0}, {Q: 2, R: 0}} {
+	for _, c := range []hex.Coord{{Q: 2, R: 0}, {Q: 3, R: 0}} {
 		node, ok := flow.Nodes[c]
 		if !ok {
 			continue
@@ -47,10 +47,10 @@ func TestBuildFlowStartOnlyEmitterEdge(t *testing.T) {
 
 func TestBuildPotentialIncludesReactiveFields(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][1] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[1][2] = field.NewTile(field.CoalChamber, 0, 0)
 
 	potential := graph.BuildPotential(s)
-	coal := potential.Nodes[hex.Coord{Q: 1, R: 1}]
+	coal := potential.Nodes[hex.Coord{Q: 1, R: 2}]
 	if len(coal.Edges) == 0 {
 		t.Fatal("potential graph should show reactive edges for coal")
 	}

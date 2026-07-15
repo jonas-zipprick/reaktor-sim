@@ -17,7 +17,7 @@ func TestBorderDemandNarrativeNamesZone(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 8, R: 0},
+		Pos:  hex.Coord{Q: 8, R: 2},
 		Dir:  hex.RotE.TravelDir(),
 	}}
 

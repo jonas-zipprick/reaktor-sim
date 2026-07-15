@@ -5,9 +5,11 @@ Ein asymmetrisches, kooperatives Aufbau- und Kollisionsspiel für 2 Spieler.
 ## **0\. Das Spielfeld im Detail**
 | Column 1 (Player 1 Side) | Column 2 (Player 1 Side) | Column 3 (Player 1 Side) | Column 4 (Player 1 Side) | Column 5 (Player 1 Side) | Column 6 (Player 2 Side) | Column 7 (Player 2 Side) | Column 8 (Player 2 Side) | Column 9 (Player 2 Side) | 
 | :---- | :---: | :---: | :---: | :---: | :---: | :---- | :---: | :---: |
-| out-of-bounds | slot | slot | slot | slot (with wall to the right) | slot (wired to Industrie and Reaktorbedarf) | slot (wired to Industrie) | slot (wired to Industrie) | slot (wired to Wohnviertel) |
+| out-of-bounds | slot | slot | slot | out-of-bounds | slot (wired to reaktor and industrie) | slot (wired to industrie) | slot (wired to industrie) |
+| out-of-bounds | slot | slot | slot | slot (with wall to the right) | slot | slot | slot | slot (wired to wohnviertel) |
 | Zünder | slot | slot | slot | Turbine (wired to Reaktorbedarf) | slot | slot | slot | slot (wired to wohnviertel) |
-| out-of-bounds | slot | slot | slot | slot (with wall on the right) | slot (wired to Bahn and to Reaktorbedarf) | slot (wired to Bahn) | slot (wired to Bahn) | slot (wired to Wohnviertel)
+| out-of-bounds | slot | slot | slot | slot (with wall on the right) | slot | slot | slot | slot (wired to Wohnviertel) |
+| out-of-bounds | slot | slot | slot | out-of-bounds | slot (wired to reaktor and Bahn) | slot (wired to Bahn) | slot (wired to Bahn) |
 
 ## **1\. Setting & Konzept**
 
@@ -195,7 +197,7 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 
 * **Ablenk-Spiegel (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Teilchen im fixen Winkel ab.  
 * **Kohle-Brennkammer (Kosten: 2 Geld | Ladung: 4 Chips):** 1 Wärme trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Wärme zufällig ab. Im ausgebrannten Zustand leitet Kohle Wärme in eine zufällige Richtung weiter.  
-* **Kühlturm (Kosten: 2 Geld | Ladung: Keine):** Vernichtet eintreffende Wärme restlos (Notbremse).  
+* **Kühlturm (Kosten: 2 Geld | Ladung: Keine):** Vernichtet von der einen Seite eintreffende Wärme restlos während es die Wärme von der anderen Seite ungehindert durchfliegen lässt.  
 
 * **Erdgas-Kessel (Kosten: 3 Geld | Ladung: 8 Chips | ab 2\. Monat):** 1 Wärme trifft ein \-\> verbraucht 3 Ladung \-\> feuert 4 Wärme ab. Vernichtet einkommende Chips im ausgebrannten Zustand.
 
@@ -211,7 +213,7 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
 
 * **Relais / Weiche (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Spannung im fixen Winkel ab.
-* **Erdung / Widerstand (Kosten: 1 Geld):** Leitet eintreffende Spannung ab (vernichtet sie). Wichtig bei Überproduktion\!  
+* **Erdung / Widerstand (Kosten: 1 Geld):** Leitet von der einen Seite eintreffende Spannung ab (vernichtet sie) während es die Spannung von der anderen Seite ungehindert durchfliegen lässt. Wichtig bei Überproduktion\!  
 * **Transformator (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
 * **Notgenerator (Kosten: 3 Geld | Ladung: 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, eine Ladung in eine gewünschte Richtung. Ist der Generator ausgebrannt, so leitet er einkommende Spannungschips in zufällige Richtungen weiter.
 

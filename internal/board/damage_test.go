@@ -11,7 +11,7 @@ import (
 func TestAddWallDamageWhenNoDemand(t *testing.T) {
 	s := board.NewEmpty()
 	s.ApplyDemands(board.ShiftDemands{Residential: 0})
-	z, ok := s.AddWallDamage(hex.Coord{Q: 8, R: 1}, hex.RotE.TravelDir(), rand.New(rand.NewSource(1)))
+	z, ok := s.AddWallDamage(hex.Coord{Q: 8, R: 2}, hex.RotE.TravelDir(), rand.New(rand.NewSource(1)))
 	if !ok {
 		t.Fatal("expected damage")
 	}

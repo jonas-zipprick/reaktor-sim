@@ -29,8 +29,8 @@ func TestRunTurbineVoltageUsesFixedShootDir(t *testing.T) {
 	tCoord := hex.Coord{Q: hex.TurbineCol, R: hex.TurbineRow}
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{
-		{Type: sim.ChipHeat, Pos: hex.Coord{Q: 4, R: 0}, Dir: 0},
-		{Type: sim.ChipHeat, Pos: hex.Coord{Q: 4, R: 2}, Dir: 0},
+		{Type: sim.ChipHeat, Pos: hex.Coord{Q: 3, R: 1}, Dir: 0},
+		{Type: sim.ChipHeat, Pos: hex.Coord{Q: 3, R: 3}, Dir: 0},
 	}
 	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(11)), cfg)
 	var dirs []int

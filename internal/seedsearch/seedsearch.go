@@ -23,6 +23,7 @@ type Options struct {
 	Shifts                int          // number of consecutive shifts to simulate (1-5)
 	ShiftKeep             int          // boards kept per ranking table to branch into the next shift
 	MonthFilter           int          // campaign month for field availability (0 = all fields)
+	Workers               int          // parallel scan workers (0 = GOMAXPROCS)
 	StartBoardFingerprint string       // if set, shift 1 loads this board and spends budget per seed
 }
 
@@ -43,6 +44,13 @@ func (o Options) shiftKeep() int {
 		return 1
 	}
 	return o.ShiftKeep
+}
+
+func (o Options) workerCount() int {
+	if o.Workers > 0 {
+		return o.Workers
+	}
+	return scanWorkers()
 }
 
 // ZoneTotals holds per-zone averages across Monte-Carlo runs (index = board.Zone).
@@ -82,6 +90,8 @@ type Outcome struct {
 	AvgRepairSpent       float64 // avg money spent on grid damage repair per run
 	AvgSteps             float64
 	Runs                 int
+	TraceLoopRun         int // 1-based MC run for loop trace export, 0 = none
+	TraceWinRun          int // 1-based MC run for win trace export, 0 = none
 }
 
 // WinRate returns the fraction of runs with all demands fulfilled.
@@ -312,6 +322,12 @@ func evaluatePrepared(seed int64, state *board.State, runs int, cfg sim.Config, 
 	results := sim.RunMonteCarlo(state, runs, seed, cfg)
 	out := aggregateOutcome(seed, state, runs, cfg.ReactorRepairBudget, cfg.RepairBudget, endLeft, results)
 	if runs > 0 {
+		if loops := sim.LoopTraceRunIndices(results, 1); len(loops) > 0 {
+			out.TraceLoopRun = loops[0]
+		}
+		if wins := sim.WinTraceRunIndices(results, 1); len(wins) > 0 {
+			out.TraceWinRun = wins[0]
+		}
 		idx := sim.MedianRunIndex(results)
 		sim.ApplyShiftCarry(state, seed, idx+1, cfg)
 		out.CarryBoardFingerprint = board.Fingerprint(state)
@@ -330,9 +346,14 @@ func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget,
 	}
 	var sumDemand, sumDamage ZoneTotals
 	var sumSteps, sumGridRepair, sumReactorRepair, sumSavedP2 float64
-	var endDemand, endDamage [4][]int
-	var endEmitter []int
-	for _, res := range results {
+	endDemand := make([][]int, 4)
+	endDamage := make([][]int, 4)
+	for z := range endDemand {
+		endDemand[z] = make([]int, runs)
+		endDamage[z] = make([]int, runs)
+	}
+	endEmitter := make([]int, runs)
+	for i, res := range results {
 		if res.AllDemandsMet {
 			out.Wins++
 		}
@@ -369,10 +390,10 @@ func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget,
 		for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
 			sumDemand[z] += float64(res.EndDemands[z])
 			sumDamage[z] += float64(res.EndDamage[z])
-			endDemand[z] = append(endDemand[z], res.EndDemands[z])
-			endDamage[z] = append(endDamage[z], res.EndDamage[z])
+			endDemand[z][i] = res.EndDemands[z]
+			endDamage[z][i] = res.EndDamage[z]
 		}
-		endEmitter = append(endEmitter, res.EndEmitterDamage)
+		endEmitter[i] = res.EndEmitterDamage
 		sumSteps += float64(res.Steps)
 	}
 	if runs > 0 {
@@ -487,6 +508,9 @@ func Scan(from, to int64, opts Options, progress ProgressFunc) (ScanResult, erro
 		if err != nil {
 			return ScanResult{}, err
 		}
+		if k >= 2 {
+			result.Shifts[k-2].Outcomes = pruneShiftOutcomes(result.Shifts[k-2].Outcomes, outcomes)
+		}
 		result.Shifts = append(result.Shifts, ShiftResult{Shift: k, Outcomes: outcomes})
 		parents = selectParents(outcomes, opts.shiftKeep())
 	}
@@ -504,8 +528,15 @@ func selectParents(outcomes []Outcome, keep int) []parentBoard {
 	exclude := loopTableKeys(outcomes, keep)
 	seen := make(map[string]struct{})
 	var parents []parentBoard
+	candidateN := keep + len(exclude)
+	if candidateN < keep*4 {
+		candidateN = keep * 4
+	}
+	if candidateN > len(outcomes) {
+		candidateN = len(outcomes)
+	}
 	for _, pick := range keepTables {
-		ranked := pick(outcomes, len(outcomes))
+		ranked := pick(outcomes, candidateN)
 		picked := 0
 		for _, o := range ranked {
 			if picked >= keep {
@@ -650,15 +681,25 @@ func totalRemainingDamage(res sim.Result) int {
 	return total + res.EndEmitterDamage
 }
 
-func topN(outcomes []Outcome, n int, less func(a, b Outcome) bool) []Outcome {
-	if n <= 0 || len(outcomes) == 0 {
-		return nil
+func pruneShiftOutcomes(outcomes []Outcome, childOutcomes []Outcome) []Outcome {
+	if len(outcomes) == 0 || len(childOutcomes) == 0 {
+		return outcomes
 	}
-	cp := append([]Outcome(nil), outcomes...)
-	sort.Slice(cp, func(i, j int) bool { return less(cp[i], cp[j]) })
-	if n > len(cp) {
-		n = len(cp)
+	needed := make(map[string]struct{})
+	for _, child := range childOutcomes {
+		if child.PrevBoardFingerprint != "" {
+			needed[child.PrevBoardFingerprint] = struct{}{}
+		}
 	}
-	return cp[:n]
+	if len(needed) == 0 {
+		return outcomes
+	}
+	pruned := make([]Outcome, 0, len(needed))
+	for _, o := range outcomes {
+		if _, ok := needed[o.BoardFingerprint]; ok {
+			pruned = append(pruned, o)
+		}
+	}
+	return pruned
 }
 

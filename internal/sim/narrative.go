@@ -268,6 +268,9 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 
 	case field.CoolingTower:
 		if chip.Type == ChipHeat {
+			if tile.Orientation.ParallelToAxis((chip.Dir + 3) % 6) {
+				return narrateWireField(incoming, "den Kühlturm", chip, coolingEmittedChip(chip, tile))
+			}
 			return "Wärme trifft Kühlturm und wird vernichtet."
 		}
 
@@ -277,8 +280,13 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 		}
 
 	case field.Ground:
-		if chip.Type == ChipVoltage && len(released) == 0 {
-			return "Spannung trifft Erdung und wird abgeleitet."
+		if chip.Type == ChipVoltage {
+			if tile.Orientation.ParallelToAxis((chip.Dir + 3) % 6) {
+				return narrateWireField(incoming, "die Erdung", chip, groundEmittedChip(chip, tile))
+			}
+			if len(released) == 0 {
+				return "Spannung trifft Erdung und wird abgeleitet."
+			}
 		}
 
 	case field.CapacitorBank, field.PumpedStorage, field.LeadAccumulator:
@@ -470,6 +478,16 @@ func narrateWireField(incoming, fieldName string, chip Chip, emitted Chip) strin
 func wireEmittedChip(chip Chip, tile field.Tile) Chip {
 	incoming := (chip.Dir + 3) % 6
 	return Chip{Type: chip.Type, Dir: tile.Orientation.WireOutgoing(incoming)}
+}
+
+func coolingEmittedChip(chip Chip, tile field.Tile) Chip {
+	incoming := (chip.Dir + 3) % 6
+	return Chip{Type: chip.Type, Dir: hex.PassThroughDir(incoming)}
+}
+
+func groundEmittedChip(chip Chip, tile field.Tile) Chip {
+	incoming := (chip.Dir + 3) % 6
+	return Chip{Type: chip.Type, Dir: hex.PassThroughDir(incoming)}
 }
 
 func isVoluntarySource(t field.Type) bool {

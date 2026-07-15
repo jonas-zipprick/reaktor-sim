@@ -12,9 +12,9 @@ import (
 
 func TestHeatReachesTurbineOnOpenPath(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][1] = field.NewTile(field.CoalChamber, 0, 0)
-	s.Tiles[2][1] = field.NewTile(field.CoalChamber, 0, 0)
-	s.Tiles[3][1] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[1][2] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[2][2] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[3][2] = field.NewTile(field.CoalChamber, 0, 0)
 
 	rng := rand.New(rand.NewSource(1))
 	cfg := sim.DefaultConfig()
@@ -48,7 +48,7 @@ func TestDirectLineToTurbine(t *testing.T) {
 
 func TestErdgasChainToTurbine(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][1] = field.NewTile(field.GasBoiler, 0, 0)
+	s.Tiles[1][2] = field.NewTile(field.GasBoiler, 0, 0)
 
 	rng := rand.New(rand.NewSource(7))
 	cfg := sim.DefaultConfig()
@@ -78,9 +78,10 @@ func TestRandomBoardsProduceHeat(t *testing.T) {
 	}
 }
 
-func TestBoardHas25Cells(t *testing.T) {
-	if len(hex.AllBoardCoords) != 25 {
-		t.Fatalf("expected 25 cells, got %d", len(hex.AllBoardCoords))
+func TestBoardCellCount(t *testing.T) {
+	const want = 35
+	if len(hex.AllBoardCoords) != want {
+		t.Fatalf("expected %d cells, got %d", want, len(hex.AllBoardCoords))
 	}
 }
 

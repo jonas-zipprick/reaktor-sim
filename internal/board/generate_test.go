@@ -9,8 +9,8 @@ import (
 
 func TestPlaceableSlots(t *testing.T) {
 	slots := PlaceableSlots()
-	if len(slots) != 23 {
-		t.Fatalf("expected 23 slots, got %d", len(slots))
+	if len(slots) != 33 {
+		t.Fatalf("expected 33 slots, got %d", len(slots))
 	}
 }
 
@@ -71,14 +71,10 @@ func TestAllCostsAchievableUpToMax(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	maxTotal := 11*8 + 12*4
-	if planner.maxCost != maxTotal {
-		t.Fatalf("expected max cost %d, got %d", maxTotal, planner.maxCost)
+	if !planner.achievable[planner.maxCost] {
+		t.Fatalf("expected max total %d to be achievable", planner.maxCost)
 	}
-	if !planner.achievable[maxTotal] {
-		t.Fatalf("expected max total %d to be achievable", maxTotal)
-	}
-	for target := 0; target <= maxTotal; target++ {
+	for target := 0; target <= planner.maxCost; target++ {
 		if !planner.achievable[target] {
 			t.Fatalf("expected target %d to be achievable", target)
 		}

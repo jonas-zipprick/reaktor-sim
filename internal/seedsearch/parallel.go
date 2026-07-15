@@ -111,7 +111,7 @@ func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, 
 		seeds = append(seeds, seed)
 	}
 	collector := newOutcomeCollector()
-	workers := scanWorkers()
+	workers := opts.workerCount()
 	jobs := make(chan int64)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
@@ -156,14 +156,8 @@ type branchJob struct {
 }
 
 func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options, tracker *scanTracker) ([]Outcome, error) {
-	jobs := make([]branchJob, 0, len(parents)*int(to-from+1))
-	for _, p := range parents {
-		for seed := from; seed <= to; seed++ {
-			jobs = append(jobs, branchJob{parent: p, seed: seed})
-		}
-	}
 	collector := newOutcomeCollector()
-	workers := scanWorkers()
+	workers := opts.workerCount()
 	work := make(chan branchJob)
 	var wg sync.WaitGroup
 	for w := 0; w < workers; w++ {
@@ -207,10 +201,14 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 			}
 		}()
 	}
-	for _, job := range jobs {
-		work <- job
-	}
-	close(work)
+	go func() {
+		for _, p := range parents {
+			for seed := from; seed <= to; seed++ {
+				work <- branchJob{parent: p, seed: seed}
+			}
+		}
+		close(work)
+	}()
 	wg.Wait()
 	if err := tracker.error(); err != nil {
 		return nil, err

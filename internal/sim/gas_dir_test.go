@@ -11,13 +11,13 @@ import (
 )
 
 func TestGasBoilerEmitsAllSixDirections(t *testing.T) {
-	pos := hex.Coord{Q: 1, R: 1}
+	pos := hex.Coord{Q: 1, R: 2}
 	seen := map[int]bool{}
 	for seed := int64(0); seed < 500; seed++ {
 		s := board.NewEmpty()
 		s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 		cfg := sim.DefaultConfig()
-		cfg.InitialChips = []sim.Chip{{Type: sim.ChipHeat, Pos: hex.Coord{Q: 0, R: 1}, Dir: hex.RotE.TravelDir()}}
+		cfg.InitialChips = []sim.Chip{{Type: sim.ChipHeat, Pos: hex.Coord{Q: 0, R: 2}, Dir: hex.RotE.TravelDir()}}
 		_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(seed)), cfg)
 		for _, snap := range snaps {
 			if snap.Event != "Feldreaktion" {

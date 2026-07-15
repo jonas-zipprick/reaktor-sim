@@ -46,8 +46,8 @@ func TestMirrorNarrativeIgnoresQueuedChipsOnSameCell(t *testing.T) {
 // must bounce it back through the mirror toward its origin:
 // origin -> E -> mirror -> NW -> wall -> SE -> mirror -> W -> origin.
 func TestMirrorBouncesChipBackOffAdjacentWall(t *testing.T) {
-	mirror := hex.Coord{Q: 2, R: 0}
-	origin := hex.Coord{Q: 1, R: 0}
+	mirror := hex.Coord{Q: 3, R: 0}
+	origin := hex.Coord{Q: 2, R: 0}
 	s := board.NewEmpty()
 	s.Tiles[mirror.Q][mirror.R] = field.NewTile(field.Mirror, hex.RotNE, 0)
 
