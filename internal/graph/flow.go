@@ -65,7 +65,7 @@ func addWireReflectEdge(g *Graph, state *board.State, chip InFlight, wire hex.Co
 	// A mirror deflecting a heat chip into an adjacent outer wall bounces it
 	// back through the mirror, which deflects it again.
 	if !hex.CanEnter(wire, outNext) && chip.Particle == Heat &&
-		hex.BlockedBoundary(wire, outNext, outDir) == hex.BoundaryOuter && wire.IsPlayer1() {
+		hex.HeatReflectsAtOuterWall(wire, outDir) {
 		bounced := (hex.ReflectOffOuterWall(outDir) + 3) % 6
 		outDir = tile.Orientation.WireOutgoing(bounced)
 		outNext = wire.Neighbor(outDir)
@@ -160,7 +160,7 @@ func flowTarget(from hex.Coord, dir int, particle ParticleType) (hex.Coord, bool
 	case hex.BoundaryOuter:
 		switch particle {
 		case Heat:
-			if !from.IsPlayer1() {
+			if !hex.HeatReflectsAtOuterWall(from, dir) {
 				return hex.Coord{}, false
 			}
 		case Neutron:

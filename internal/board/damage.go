@@ -21,7 +21,7 @@ func (s *State) AddZoneDamage(z Zone) {
 // AddWallDamage places one damage chip on a zone for an outer-wall voltage hit
 // when no demand chip was available. The zone is chosen from the wall crossing.
 func (s *State) AddWallDamage(from hex.Coord, travelDir int, rng *rand.Rand) (Zone, bool) {
-	zones := ZonesForOuterWallHit(from, travelDir)
+	zones := ZonesForWallDemandHit(from, travelDir)
 	if len(zones) == 0 {
 		return 0, false
 	}

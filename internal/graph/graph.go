@@ -258,7 +258,7 @@ func forwardOrReflect(c hex.Coord, incomingDir int, heat, neutron, voltage float
 		return nil
 	case hex.BoundaryOuter:
 		h, n, v := 0.0, 0.0, 0.0
-		if heat > 0 && c.IsPlayer1() {
+		if heat > 0 && hex.HeatReflectsAtOuterWall(c, incomingDir) {
 			h = heat
 		}
 		if voltage > 0 && c.IsPlayer2() {

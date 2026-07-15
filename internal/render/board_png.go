@@ -52,13 +52,20 @@ func WriteBoardPNG(state *board.State, path string, view ChipView) error {
 		drawCellLabels(img, center, cellLabelLines(state, c, tile, view), colText)
 	}
 
+	drawBoardWalls(img, ly, 0)
+
 	drawDemandOutside(img, state, ly, 0)
 
 	drawLabelLeft(img, image.Pt(10, ly.gridHeight+10), "Reaktor (Spalten 1-5) | Turbine Tu | Stromnetz (Spalten 6-9)", colText)
 	for i, line := range Legend() {
 		drawLabelLeft(img, image.Pt(10, ly.gridHeight+28+i*legendLineHeight), line, colText)
 	}
-	zoneY := ly.gridHeight + 28 + len(Legend())*legendLineHeight
+	wallLegend := WallLegendLines()
+	wallY := ly.gridHeight + 28 + len(Legend())*legendLineHeight
+	for i, line := range wallLegend {
+		drawLabelLeft(img, image.Pt(10, wallY+i*legendLineHeight), line, colText)
+	}
+	zoneY := wallY + len(wallLegend)*legendLineHeight
 	drawLabelLeft(img, image.Pt(10, zoneY), "Rand-Bedarf ausserhalb: I oben  W rechts  b unten  R oben (Turbine)", colText)
 
 	return writePNG(path, img)

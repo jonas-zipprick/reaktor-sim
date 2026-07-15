@@ -38,6 +38,144 @@ func TestHeatReflectsOffPlayer1OuterWall(t *testing.T) {
 	}
 }
 
+func TestHeatDoesNotReflectAtTurbineInterfaceSlots(t *testing.T) {
+	cases := []struct {
+		c   hex.Coord
+		dir hex.Rotation
+	}{
+		{hex.Coord{Q: 4, R: 1}, hex.RotNE},
+		{hex.Coord{Q: 4, R: 1}, hex.RotNW},
+		{hex.Coord{Q: 4, R: 3}, hex.RotSE},
+		{hex.Coord{Q: 4, R: 3}, hex.RotSW},
+	}
+	for _, tc := range cases {
+		cfg := testCfg()
+		cfg.InitialChips = []sim.Chip{{
+			Type: sim.ChipHeat,
+			Pos:  tc.c,
+			Dir:  tc.dir.TravelDir(),
+		}}
+		_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+		verpuff := false
+		for _, snap := range snaps {
+			if snap.Event == "Waerme-Reflektion" {
+				t.Fatalf("(%d,%d) %s should verpuff beside turbine", tc.c.Q, tc.c.R, tc.dir)
+			}
+			if snap.Event == "Waerme verpufft" {
+				verpuff = true
+				break
+			}
+		}
+		if !verpuff {
+			t.Fatalf("(%d,%d) %s expected verpuff", tc.c.Q, tc.c.R, tc.dir)
+		}
+	}
+}
+
+func TestVoltagePlantWallAtReactorPartition(t *testing.T) {
+	cases := []struct {
+		c   hex.Coord
+		dir hex.Rotation
+	}{
+		{hex.Coord{Q: 4, R: 1}, hex.RotW},
+		{hex.Coord{Q: 4, R: 3}, hex.RotW},
+	}
+	for _, tc := range cases {
+		cfg := testCfg()
+		cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
+		cfg.InitialChips = []sim.Chip{{
+			Type: sim.ChipVoltage,
+			Pos:  tc.c,
+			Dir:  tc.dir.TravelDir(),
+		}}
+		res := sim.Run(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+		if res.ZoneDeliveries[board.ZonePlant] != 1 {
+			t.Fatalf("(%d,%d) %s plant deliveries = %d, want 1", tc.c.Q, tc.c.R, tc.dir, res.ZoneDeliveries[board.ZonePlant])
+		}
+	}
+}
+
+func TestVoltagePlantWallOnTurbineNW(t *testing.T) {
+	cfg := testCfg()
+	cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipVoltage,
+		Pos:  hex.Coord{Q: hex.TurbineCol, R: hex.TurbineRow},
+		Dir:  hex.RotNW.TravelDir(),
+	}}
+
+	res := sim.Run(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+	if res.ZoneDeliveries[board.ZonePlant] != 1 {
+		t.Fatalf("plant deliveries = %d, want 1", res.ZoneDeliveries[board.ZonePlant])
+	}
+}
+
+func TestVoltagePlantWallBesideTurbine(t *testing.T) {
+	cfg := testCfg()
+	cfg.ShiftDemands = board.ShiftDemands{Plant: 1}
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipVoltage,
+		Pos:  hex.Coord{Q: 4, R: 1},
+		Dir:  hex.RotNW.TravelDir(),
+	}}
+
+	res := sim.Run(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+	if res.ZoneDeliveries[board.ZonePlant] != 1 {
+		t.Fatalf("plant deliveries = %d, want 1", res.ZoneDeliveries[board.ZonePlant])
+	}
+}
+
+func TestHeatReflectsAtReactorWallNotchCorners(t *testing.T) {
+	cases := []struct {
+		c   hex.Coord
+		dir hex.Rotation
+		want string
+	}{
+		{hex.Coord{Q: 3, R: 1}, hex.RotNE, "SW"},
+		{hex.Coord{Q: 3, R: 3}, hex.RotSE, "NW"},
+	}
+	for _, tc := range cases {
+		cfg := testCfg()
+		cfg.InitialChips = []sim.Chip{{
+			Type: sim.ChipHeat,
+			Pos:  tc.c,
+			Dir:  tc.dir.TravelDir(),
+		}}
+		_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+		found := false
+		for _, snap := range snaps {
+			if snap.Event != "Waerme-Reflektion" {
+				continue
+			}
+			found = true
+			if !strings.Contains(snap.Narrative, "Richtung "+tc.want) {
+				t.Fatalf("(%d,%d) %s reflect want %s, got %q", tc.c.Q, tc.c.R, tc.dir, tc.want, snap.Narrative)
+			}
+			break
+		}
+		if !found {
+			t.Fatalf("(%d,%d) %s expected heat reflection", tc.c.Q, tc.c.R, tc.dir)
+		}
+	}
+}
+
+func TestHeatReflectsBesideIgniter(t *testing.T) {
+	cfg := testCfg()
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipHeat,
+		Pos:  hex.Coord{Q: 1, R: 1},
+		Dir:  hex.RotNW.TravelDir(),
+	}}
+
+	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(1)), cfg)
+	for _, snap := range snaps {
+		if snap.Event == "Waerme-Reflektion" {
+			return
+		}
+	}
+	t.Fatal("expected heat reflection beside igniter on P1 outer border")
+}
+
 func TestHeatReflectionNWToSE(t *testing.T) {
 	cfg := testCfg()
 	cfg.InitialChips = []sim.Chip{{

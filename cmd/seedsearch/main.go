@@ -37,7 +37,8 @@ func main() {
 	tracePNG := flag.Bool("trace-png", true, "Schritt-PNGs in Top-Sim-Traces schreiben")
 	topSimCharts := flag.Bool("top-sim-charts", false, "Zusatz-Charts je Top-Sim (fuehrt Monte-Carlo erneut aus)")
 	outFull := flag.Bool("out-full", false, "YAML enthaelt alle Outcomes (sonst nur Top-Listen)")
-	spillDir := flag.String("spill-dir", "", "Zwischenergebnisse auf Disk (leer = bei -schichten>1 auto unter -charts-dir/.spill)")
+	spillDir := flag.String("spill-dir", "", "Verzeichnis fuer ausgelagerte Schicht-Ergebnisse (leer = bei -schichten>1 auto unter -charts-dir/.spill)")
+	spillMemoryMB := flag.Int("spill-memory-mb", 1024, "Schicht-Ergebnisse erst ab dieser Prozess-Speichernutzung auf Disk (0 = immer wenn -spill-dir aktiv)")
 	monthFilter := flag.Int("month-filter", 0, "Kampagnenmonat: nur dann verfuegbare Felder kaufen (0 = alle)")
 	startBoard := flag.String("start-board", "", "Board-Fingerprint als Startbrett (Folgemonat: Kaufvarianten statt Neugenerierung)")
 	flag.Parse()
@@ -62,6 +63,9 @@ func main() {
 	}
 	if *workers < 0 {
 		log.Fatal("-workers muss >= 0 sein")
+	}
+	if *spillMemoryMB < 0 {
+		log.Fatal("-spill-memory-mb muss >= 0 sein")
 	}
 	if *monthFilter < 0 {
 		log.Fatal("-month-filter muss >= 0 sein")
@@ -110,6 +114,11 @@ func main() {
 		}
 	}
 	opts.SpillDir = *spillDir
+	if *spillMemoryMB == 0 {
+		opts.SpillMemoryThreshold = 0
+	} else {
+		opts.SpillMemoryThreshold = uint64(*spillMemoryMB) << 20
+	}
 
 	total := *to - *from + 1
 	var reportBuf strings.Builder
@@ -130,7 +139,11 @@ func main() {
 			*shiftKeep, seedsearch.KeepTableCount)
 	}
 	if opts.SpillDir != "" {
-		fmt.Fprintf(out, "RAM-Sparmodus: Zwischenergebnisse in %s\n", opts.SpillDir)
+		if opts.SpillMemoryThreshold == 0 {
+			fmt.Fprintf(out, "RAM-Auslagerung: immer nach %s\n", opts.SpillDir)
+		} else {
+			fmt.Fprintf(out, "RAM-Auslagerung: ab %d MB Prozess-Speicher nach %s\n", opts.SpillMemoryThreshold>>20, opts.SpillDir)
+		}
 	}
 	for k := 1; k <= *shifts; k++ {
 		d := energyCard.ShiftDemands(k)

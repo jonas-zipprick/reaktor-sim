@@ -21,10 +21,10 @@ func DefaultShiftDemands() ShiftDemands {
 	return ShiftDemands{Industry: 1, Residential: 0, Rail: 0, Plant: 1}
 }
 
-var industryCells = []hex.Coord{{Q: 5, R: 0}, {Q: 6, R: 0}, {Q: 7, R: 0}}
-var railCells = []hex.Coord{{Q: 5, R: 4}, {Q: 6, R: 4}, {Q: 7, R: 4}}
-var residentialCells = []hex.Coord{{Q: 8, R: 2}, {Q: 8, R: 3}}
-var plantCells = []hex.Coord{{Q: 5, R: 0}, {Q: 5, R: 4}}
+var industryCells = []hex.Coord{{Q: 6, R: 0}, {Q: 7, R: 0}, {Q: 8, R: 0}}
+var railCells = []hex.Coord{{Q: 6, R: 4}, {Q: 7, R: 4}, {Q: 8, R: 4}}
+var residentialCells = []hex.Coord{{Q: 8, R: 1}, {Q: 8, R: 2}, {Q: 8, R: 3}}
+var plantCells = []hex.Coord{{Q: hex.TurbineCol, R: hex.TurbineRow}}
 
 // ApplyDemands adds demand chips on wired border cells for a new shift.
 func (s *State) ApplyDemands(d ShiftDemands) {
@@ -108,18 +108,19 @@ func ZonesForOuterWallHit(from hex.Coord, travelDir int) []Zone {
 
 	if next.R < 0 {
 		zones = append(zones, ZoneIndustry)
-		if from.Q == hex.Player2MinCol && next.Q < from.Q {
-			zones = append(zones, ZonePlant)
-		}
 	}
 	if next.R >= hex.Rows {
 		zones = append(zones, ZoneRail)
-		if from.Q == hex.Player2MinCol && next.Q < from.Q {
-			zones = append(zones, ZonePlant)
-		}
 	}
 	if next.Q >= hex.Cols {
-		zones = append(zones, ZoneResidential)
+		switch from.R {
+		case 0:
+			zones = append(zones, ZoneIndustry)
+		case hex.Rows - 1:
+			zones = append(zones, ZoneRail)
+		default:
+			zones = append(zones, ZoneResidential)
+		}
 	}
 	if next.Q < 0 {
 		zones = append(zones, ZonePlant)
@@ -128,10 +129,78 @@ func ZonesForOuterWallHit(from hex.Coord, travelDir int) []Zone {
 	return zones
 }
 
+// PlantWallZone reports whether travelDir from is a fixed Reaktoreigenbedarf wall.
+func PlantWallZone(from hex.Coord, travelDir int) (Zone, bool) {
+	return plantWallZone(from, travelDir)
+}
+
+// PlantWallHits lists fixed Reaktoreigenbedarf walls beside the turbine column.
+func PlantWallHits() []struct {
+	From hex.Coord
+	Dir  int
+} {
+	t := hex.Coord{Q: hex.TurbineCol, R: hex.TurbineRow}
+	return []struct {
+		From hex.Coord
+		Dir  int
+	}{
+		{hex.Coord{Q: hex.TurbineCol, R: 1}, hex.RotNW.TravelDir()},
+		{hex.Coord{Q: hex.TurbineCol, R: 1}, hex.RotW.TravelDir()},
+		{hex.Coord{Q: hex.TurbineCol, R: 3}, hex.RotSW.TravelDir()},
+		{hex.Coord{Q: hex.TurbineCol, R: 3}, hex.RotW.TravelDir()},
+		{t, hex.RotNW.TravelDir()},
+		{t, hex.RotSW.TravelDir()},
+		{t, hex.RotW.TravelDir()},
+	}
+}
+
+// TurbinePlantWallLeave reports whether a voltage chip leaving the turbine in
+// travelDir should satisfy Reaktoreigenbedarf before entering a neighbor cell.
+func TurbinePlantWallLeave(from hex.Coord, travelDir int) bool {
+	if !from.IsTurbine() {
+		return false
+	}
+	switch travelDir {
+	case hex.RotNW.TravelDir(), hex.RotSW.TravelDir():
+		_, ok := PlantWallZone(from, travelDir)
+		return ok
+	default:
+		return false
+	}
+}
+
+func plantWallZone(from hex.Coord, travelDir int) (Zone, bool) {
+	for _, hit := range PlantWallHits() {
+		if hit.From == from && hit.Dir == travelDir {
+			return ZonePlant, true
+		}
+	}
+	return 0, false
+}
+
+// ZonesForWallDemandHit returns zones whose border demand may be satisfied when
+// a voltage chip leaves from in travelDir and hits a wired wall.
+func ZonesForWallDemandHit(from hex.Coord, travelDir int) []Zone {
+	zones := ZonesForOuterWallHit(from, travelDir)
+	if z, ok := plantWallZone(from, travelDir); ok {
+		zones = appendZoneIfMissing(zones, z)
+	}
+	return zones
+}
+
+func appendZoneIfMissing(zones []Zone, z Zone) []Zone {
+	for _, existing := range zones {
+		if existing == z {
+			return zones
+		}
+	}
+	return append(zones, z)
+}
+
 // TryConsumeWallDemand removes one demand chip for a zone allowed by the wall
 // hit when leaving from in travelDir. The field under the chip does not matter.
 func (s *State) TryConsumeWallDemand(from hex.Coord, travelDir int, rng *rand.Rand) (Zone, bool) {
-	zones := ZonesForOuterWallHit(from, travelDir)
+	zones := ZonesForWallDemandHit(from, travelDir)
 	eligible := make([]Zone, 0, len(zones))
 	for _, z := range zones {
 		if s.TotalDemand(z) > 0 {
@@ -141,11 +210,25 @@ func (s *State) TryConsumeWallDemand(from hex.Coord, travelDir int, rng *rand.Ra
 	if len(eligible) == 0 {
 		return 0, false
 	}
-	z := eligible[rng.Intn(len(eligible))]
+	z := pickWallDemandZone(eligible)
 	if !s.TryConsumeZone(z, rng) {
 		return 0, false
 	}
 	return z, true
+}
+
+func pickWallDemandZone(eligible []Zone) Zone {
+	if len(eligible) == 1 {
+		return eligible[0]
+	}
+	for _, pref := range []Zone{ZoneIndustry, ZonePlant, ZoneResidential, ZoneRail} {
+		for _, cand := range eligible {
+			if cand == pref {
+				return cand
+			}
+		}
+	}
+	return eligible[0]
 }
 
 // TryConsumeZone removes one demand chip for zone z from any wired cell.

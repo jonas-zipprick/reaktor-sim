@@ -15,6 +15,10 @@ import (
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
 
+// DefaultSpillMemoryThreshold is the process memory (runtime.MemStats.Sys) above
+// which shift outcomes spill to disk incrementally during a scan.
+const DefaultSpillMemoryThreshold = 1 << 30 // 1 GiB
+
 // Options configure a full-month (multi-shift) Monte-Carlo scan.
 type Options struct {
 	Runs                  int
@@ -25,7 +29,10 @@ type Options struct {
 	MonthFilter           int          // campaign month for field availability (0 = all fields)
 	Workers               int          // parallel scan workers (0 = GOMAXPROCS)
 	StartBoardFingerprint string       // if set, shift 1 loads this board and spends budget per seed
-	SpillDir              string       // if set, shift outcomes are written here and released from RAM
+	SpillDir              string       // directory for spilled shift outcomes
+	// SpillMemoryThreshold is the minimum process memory (MemStats.Sys) before
+	// outcomes leave RAM. Zero means spill whenever SpillDir is set.
+	SpillMemoryThreshold uint64
 }
 
 // shiftCount clamps the configured shift count to the valid 1-5 range.
@@ -500,31 +507,35 @@ func Scan(from, to int64, opts Options, progress ProgressFunc) (ScanResult, erro
 	tracker := newScanTracker(progress, EstimateScanWork(from, to, opts))
 	tracker.setShift(1)
 
-	shift1, err := scanShift1(from, to, opts, tracker)
+	sr1, err := scanShift1(from, to, opts, tracker)
 	if err != nil {
 		return ScanResult{}, err
 	}
-	parents := selectParents(shift1, opts.shiftKeep())
-	sr1 := ShiftResult{Shift: 1, Outcomes: shift1}
-	if err := spillShiftResult(&sr1, opts.SpillDir); err != nil {
+	parents, err := selectParentsFromShiftResult(sr1, opts.shiftKeep())
+	if err != nil {
+		return ScanResult{}, err
+	}
+	if err := spillShiftResult(&sr1, opts); err != nil {
 		return ScanResult{}, err
 	}
 	result.Shifts = append(result.Shifts, sr1)
 
 	for k := 2; k <= shifts; k++ {
 		tracker.setShift(k)
-		outcomes, err := scanShiftBranch(k, from, to, parents, opts, tracker)
+		sr, err := scanShiftBranch(k, from, to, parents, opts, tracker)
 		if err != nil {
 			return ScanResult{}, err
 		}
 		if k >= 2 {
-			if err := prunePreviousShift(&result.Shifts[k-2], outcomes, opts.SpillDir); err != nil {
+			if err := prunePreviousShift(&result.Shifts[k-2], sr, opts); err != nil {
 				return ScanResult{}, err
 			}
 		}
-		parents = selectParents(outcomes, opts.shiftKeep())
-		sr := ShiftResult{Shift: k, Outcomes: outcomes}
-		if err := spillShiftResult(&sr, opts.SpillDir); err != nil {
+		parents, err = selectParentsFromShiftResult(sr, opts.shiftKeep())
+		if err != nil {
+			return ScanResult{}, err
+		}
+		if err := spillShiftResult(&sr, opts); err != nil {
 			return ScanResult{}, err
 		}
 		result.Shifts = append(result.Shifts, sr)

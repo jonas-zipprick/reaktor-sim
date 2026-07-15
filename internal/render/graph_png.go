@@ -46,7 +46,7 @@ func WriteGraphPNG(state *board.State, g *graph.Graph, path string, caption stri
 	}
 	width := minWidth
 	captionHeight := captionBlockHeight(captionLines)
-	height := ly.height + 2*legendLineHeight + captionHeight
+	height := ly.height + 3*legendLineHeight + captionHeight
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
 	for y := 0; y < img.Bounds().Dy(); y++ {
@@ -102,6 +102,7 @@ func WriteGraphPNG(state *board.State, g *graph.Graph, path string, caption stri
 		drawCellLabels(img, center, cellLabelLines(state, node.Coord, tile, view), colText)
 	}
 
+	drawBoardWalls(img, ly, captionOffset)
 	drawDemandOutside(img, state, ly, captionOffset)
 	drawEmitterDamageOutside(img, state, ly, captionOffset)
 
@@ -111,7 +112,8 @@ func WriteGraphPNG(state *board.State, g *graph.Graph, path string, caption stri
 	drawLabelLeft(img, image.Pt(10, legendY+2*legendLineHeight), legend3, colText)
 	drawLabelLeft(img, image.Pt(10, legendY+3*legendLineHeight), legend4, colText)
 	drawLabelLeft(img, image.Pt(10, legendY+4*legendLineHeight), "Rand-Bedarf ausserhalb des Feldes: I/W/b/R + Zahl", colText)
-	drawLabelLeft(img, image.Pt(10, legendY+5*legendLineHeight), fmt.Sprintf("%d Knoten, Kanten mit P >= %.0f%%", len(g.Nodes), minEdgeProb*100), colText)
+	drawLabelLeft(img, image.Pt(10, legendY+5*legendLineHeight), "Wand-Kanten: braun=Reaktorwand  blau=Spannungs-Reflektion  farbig+Buchstabe=Rand-Bedarf", colText)
+	drawLabelLeft(img, image.Pt(10, legendY+6*legendLineHeight), fmt.Sprintf("%d Knoten, Kanten mit P >= %.0f%%", len(g.Nodes), minEdgeProb*100), colText)
 
 	return writePNG(path, img)
 }

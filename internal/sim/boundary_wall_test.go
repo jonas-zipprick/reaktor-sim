@@ -16,7 +16,7 @@ func TestVoltageSEFromBottomRowDamagesWhenRailEmpty(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{Industry: 1, Residential: 1, Plant: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 5, R: 4},
+		Pos:  hex.Coord{Q: 6, R: 4},
 		Dir:  hex.RotSE.TravelDir(),
 	}}
 
@@ -37,7 +37,7 @@ func TestVoltageSEFromBottomRowConsumesRail(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{Rail: 1, Residential: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 5, R: 4},
+		Pos:  hex.Coord{Q: 6, R: 4},
 		Dir:  hex.RotSE.TravelDir(),
 	}}
 

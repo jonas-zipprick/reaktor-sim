@@ -31,6 +31,14 @@ func narrate(event string, resolved *Chip, b *board.State, queue []Chip, emitted
 			)
 		}
 		return narrateWithoutChip(event, b, queue)
+	case "Spannungs-Reflektion":
+		if resolved != nil {
+			return fmt.Sprintf(
+				"Spannung prallt an der Wand ab und fliegt in Richtung %s.",
+				dirName(resolved.Dir),
+			)
+		}
+		return narrateWithoutChip(event, b, queue)
 	case "Spannungs-Spike":
 		if resolved != nil {
 			return fmt.Sprintf("Spannungs-Spike: Spannung wird in Richtung %s reflektiert.", dirName(resolved.Dir))
@@ -112,6 +120,13 @@ func narrateWithoutChip(event string, b *board.State, queue []Chip) string {
 			}
 		}
 		return "Wärme prallt an der Wand ab."
+	case "Spannungs-Reflektion":
+		for _, c := range queue {
+			if c.Type == ChipVoltage {
+				return fmt.Sprintf("Spannung prallt an der Wand ab und fliegt in Richtung %s.", dirName(c.Dir))
+			}
+		}
+		return "Spannung prallt an der Wand ab."
 	case "Spannungs-Spike":
 		for _, c := range queue {
 			if c.Type == ChipVoltage {
@@ -300,6 +315,11 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 	case field.Superconductor:
 		if len(released) == 1 {
 			return fmt.Sprintf("Spannung teleportiert über Supraleiter und fliegt in Richtung %s weiter.", dirName(released[0].Dir))
+		}
+
+	case field.EmergencyGenerator:
+		if chip.Type == ChipVoltage && len(released) == 0 && !tile.BurnedOut && tile.Charge > 0 {
+			return "Spannung trifft Notgenerator und wird vernichtet."
 		}
 	}
 

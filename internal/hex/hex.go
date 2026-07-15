@@ -14,6 +14,9 @@ const (
 	EmitterRow = 2
 	TurbineCol = 4
 	TurbineRow = 2
+
+	// ReactorWallCol is the player-1 column with a fixed wall to player 2 on rows 1 and 3.
+	ReactorWallCol = 3
 )
 
 // Coord is an odd-r offset hex (pointy-top). Q = column, R = row.
@@ -50,20 +53,20 @@ func (c Coord) Valid() bool {
 	if c.R < 0 || c.R >= Rows || c.Q < 0 || c.Q >= Cols {
 		return false
 	}
-	// Left column is out of bounds except for the emitter (Zünder).
-	if c.Q == 0 && c.R != EmitterRow {
-		return false
+	// Column 1 (Q=0): slots above and below the emitter on the middle row.
+	if c.Q == 0 {
+		return c.R >= 1 && c.R <= 3
 	}
-	// Column 2 is out of bounds on the top and bottom extension rows.
+	// Column 2 (Q=1): out of bounds on the top and bottom extension rows.
 	if c.Q == 1 && (c.R == 0 || c.R == Rows-1) {
 		return false
 	}
-	// Center column is out of bounds on the top and bottom extension rows.
+	// Center column (Q=4): out of bounds on the top and bottom extension rows.
 	if c.Q == TurbineCol && (c.R == 0 || c.R == Rows-1) {
 		return false
 	}
-	// Right column has no slots on the top and bottom extension rows.
-	if c.Q == Cols-1 && (c.R == 0 || c.R == Rows-1) {
+	// Column 6 (Q=5): out of bounds on the top and bottom extension rows.
+	if c.Q == 5 && (c.R == 0 || c.R == Rows-1) {
 		return false
 	}
 	return true
@@ -111,7 +114,7 @@ func wallRow(r int) bool {
 
 // HasWallRight is true for player-1 cells with a fixed wall to player 2 (rows 1 and 3).
 func (c Coord) HasWallRight() bool {
-	return c.Q == Player1MaxCol && wallRow(c.R)
+	return c.Q == ReactorWallCol && wallRow(c.R)
 }
 
 // WallBlocksEast returns true if a chip cannot move east from this cell into player 2.
@@ -122,7 +125,7 @@ func (c Coord) WallBlocksEast() bool {
 // WallBlocksWest returns true if a chip cannot move west from this cell into
 // player 1 (the fixed reactor wall, seen from the player-2 side).
 func (c Coord) WallBlocksWest() bool {
-	return c.Q == Player2MinCol && wallRow(c.R)
+	return c.Q == ReactorWallCol+1 && wallRow(c.R)
 }
 
 // oddRNeighborDeltas are pointy-top odd-r offsets (E, NE, NW, W, SW, SE).
@@ -177,8 +180,8 @@ func CanEnter(from, to Coord) bool {
 	if !to.Valid() {
 		return false
 	}
-	// The fixed reactor wall between columns 4 and 5 (rows 0 and 2) blocks the
-	// straight E/W crossing in both directions; the diagonal turbine edges stay open.
+	// The fixed reactor wall between columns 4 and 5 (Q=3|Q=4, rows 1 and 3) blocks
+	// the straight E/W crossing in both directions; the diagonal turbine edges stay open.
 	if from.WallBlocksEast() && to.Q > from.Q && to.R == from.R {
 		return false
 	}

@@ -23,12 +23,49 @@ func TestEmergencyGeneratorSurvivesVoltageHit(t *testing.T) {
 		Dir:  hex.RotE.TravelDir(),
 	}}
 
-	res, _ := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
-	if res.CriticalFailure {
-		t.Fatal("unexpected critical failure")
-	}
+	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
 	if s.Tiles[pos.Q][pos.R].Type != field.EmergencyGenerator {
 		t.Fatalf("tile type = %v, want emergency generator", s.Tiles[pos.Q][pos.R].Type)
+	}
+	if got := s.Tiles[pos.Q][pos.R].Charge; got != 2 {
+		t.Fatalf("charge = %d, want 2 (incoming voltage must not add charge)", got)
+	}
+	destroyed := false
+	for _, snap := range snaps {
+		if snap.Narrative == "Spannung trifft Notgenerator und wird vernichtet." {
+			destroyed = true
+			break
+		}
+	}
+	if !destroyed {
+		t.Fatal("expected loaded notgenerator to destroy incoming voltage")
+	}
+}
+
+func TestEmergencyGeneratorDestroysIncomingVoltageWhileLoaded(t *testing.T) {
+	pos := hex.Coord{Q: 6, R: 1}
+	s := board.NewEmpty()
+	s.Tiles[pos.Q][pos.R] = field.NewTile(field.EmergencyGenerator, 0, 0)
+
+	cfg := sim.DefaultConfig()
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipVoltage,
+		Pos:  hex.Coord{Q: 5, R: 1},
+		Dir:  hex.RotE.TravelDir(),
+	}}
+
+	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
+	destroyed := false
+	for _, snap := range snaps {
+		if snap.Event == "Weiterleitung" {
+			t.Fatal("loaded notgenerator must not redirect incoming voltage")
+		}
+		if snap.Narrative == "Spannung trifft Notgenerator und wird vernichtet." {
+			destroyed = true
+		}
+	}
+	if !destroyed {
+		t.Fatal("expected incoming voltage to be destroyed at loaded notgenerator")
 	}
 }
 
@@ -104,6 +141,73 @@ func TestEmergencyGeneratorNoVoluntaryFireWithoutDemand(t *testing.T) {
 	sim.RunTrace(s, rand.New(rand.NewSource(7)), cfg)
 	if got := s.Tiles[pos.Q][pos.R].Charge; got != 2 {
 		t.Fatalf("charge = %d, want 2 (no fire without demand)", got)
+	}
+}
+
+func TestEmergencyGeneratorWaitsForOtherVoltage(t *testing.T) {
+	ngPos := hex.Coord{Q: 6, R: 1}
+	vPos := hex.Coord{Q: 5, R: 1}
+	s := board.NewEmpty()
+	s.Tiles[ngPos.Q][ngPos.R] = field.NewTile(field.EmergencyGenerator, 0, 0)
+	s.ApplyDemands(board.ShiftDemands{Residential: 1})
+
+	cfg := sim.DefaultConfig()
+	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipVoltage,
+		Pos:  vPos,
+		Dir:  hex.RotE.TravelDir(),
+	}}
+
+	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(11)), cfg)
+	for _, snap := range snaps {
+		hasOtherVoltage := snap.Active != nil &&
+			snap.Active.Type == sim.ChipVoltage && snap.Active.Pos != ngPos
+		if !hasOtherVoltage {
+			for _, c := range snap.Queue {
+				if c.Type == sim.ChipVoltage && c.Pos != ngPos {
+					hasOtherVoltage = true
+					break
+				}
+			}
+		}
+		if !hasOtherVoltage {
+			continue
+		}
+		if snap.Event == "Freiwilliger Schuss" {
+			for _, c := range snap.Queue {
+				if c.Pos == ngPos && c.Type == sim.ChipVoltage {
+					t.Fatalf("notgenerator fired at step %d while other voltage still on board", snap.Step)
+				}
+			}
+		}
+	}
+}
+
+func TestEmergencyGeneratorWaitsForStoredVoltage(t *testing.T) {
+	ngPos := hex.Coord{Q: 6, R: 1}
+	capPos := hex.Coord{Q: 7, R: 1}
+	s := board.NewEmpty()
+	s.Tiles[ngPos.Q][ngPos.R] = field.NewTile(field.EmergencyGenerator, 0, 0)
+	s.Tiles[capPos.Q][capPos.R] = field.NewTile(field.CapacitorBank, 0, 0)
+	s.Tiles[capPos.Q][capPos.R].StoredVoltage = 2
+	s.ApplyDemands(board.ShiftDemands{Residential: 1})
+
+	cfg := sim.DefaultConfig()
+	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
+
+	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(17)), cfg)
+	for _, snap := range snaps {
+		if snap.Event != "Freiwilliger Schuss" {
+			continue
+		}
+		for _, c := range snap.Queue {
+			if c.Pos == ngPos && c.Type == sim.ChipVoltage {
+				if snap.Board.Tiles[capPos.Q][capPos.R].StoredVoltage > 0 {
+					t.Fatalf("notgenerator fired at step %d while capacitor still held voltage", snap.Step)
+				}
+			}
+		}
 	}
 }
 

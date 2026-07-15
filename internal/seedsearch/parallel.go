@@ -1,8 +1,11 @@
 package seedsearch
 
 import (
+	"encoding/gob"
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -10,6 +13,8 @@ import (
 	"github.com/jonas/reaktor-sim/internal/board"
 	"github.com/jonas/reaktor-sim/internal/rules"
 )
+
+const spillCheckInterval = 64
 
 func scanWorkers() int {
 	n := runtime.GOMAXPROCS(0)
@@ -74,13 +79,24 @@ func (t *scanTracker) error() error {
 }
 
 type outcomeCollector struct {
-	mu    sync.Mutex
-	seen  map[string]struct{}
-	items []Outcome
+	mu             sync.Mutex
+	seen           map[string]struct{}
+	items          []Outcome
+	opts           Options
+	shift          int
+	spillPath      string
+	spillFile      *os.File
+	spillEnc       *gob.Encoder
+	totalCount     int
+	addsSinceCheck int
 }
 
-func newOutcomeCollector() *outcomeCollector {
-	return &outcomeCollector{seen: make(map[string]struct{})}
+func newOutcomeCollector(opts Options, shift int) *outcomeCollector {
+	return &outcomeCollector{
+		seen:  make(map[string]struct{}),
+		opts:  opts,
+		shift: shift,
+	}
 }
 
 func (c *outcomeCollector) tryClaim(key string) bool {
@@ -93,24 +109,88 @@ func (c *outcomeCollector) tryClaim(key string) bool {
 	return true
 }
 
-func (c *outcomeCollector) add(o Outcome) {
+func (c *outcomeCollector) add(o Outcome) error {
 	c.mu.Lock()
 	c.items = append(c.items, o)
+	c.totalCount++
+	c.addsSinceCheck++
+	shouldCheck := c.opts.SpillDir != "" && c.addsSinceCheck >= spillCheckInterval
 	c.mu.Unlock()
+	if shouldCheck {
+		return c.maybeFlush()
+	}
+	return nil
 }
 
-func (c *outcomeCollector) snapshot() []Outcome {
+func (c *outcomeCollector) maybeFlush() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return append([]Outcome(nil), c.items...)
+	c.addsSinceCheck = 0
+	if c.opts.SpillDir == "" || len(c.items) == 0 {
+		return nil
+	}
+	if !shouldSpillToDisk(c.opts) {
+		return nil
+	}
+	return c.flushLocked()
 }
 
-func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, error) {
-	seeds := make([]int64, 0, to-from+1)
-	for seed := from; seed <= to; seed++ {
-		seeds = append(seeds, seed)
+func (c *outcomeCollector) flushLocked() error {
+	if len(c.items) == 0 {
+		return nil
 	}
-	collector := newOutcomeCollector()
+	if c.spillPath == "" {
+		if err := os.MkdirAll(c.opts.SpillDir, 0o755); err != nil {
+			return fmt.Errorf("spill dir %s: %w", c.opts.SpillDir, err)
+		}
+		c.spillPath = filepath.Join(c.opts.SpillDir, fmt.Sprintf("shift%d.gob", c.shift))
+	}
+	if c.spillFile == nil {
+		f, err := os.OpenFile(c.spillPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		if err != nil {
+			return fmt.Errorf("spill open %s: %w", c.spillPath, err)
+		}
+		c.spillFile = f
+		c.spillEnc = gob.NewEncoder(f)
+	}
+	if err := c.spillEnc.Encode(c.items); err != nil {
+		return fmt.Errorf("spill encode %s: %w", c.spillPath, err)
+	}
+	c.items = c.items[:0]
+	releaseMemory()
+	return nil
+}
+
+func (c *outcomeCollector) closeSpill() {
+	if c.spillFile != nil {
+		_ = c.spillFile.Close()
+		c.spillFile = nil
+		c.spillEnc = nil
+	}
+}
+
+func (c *outcomeCollector) finish() (ShiftResult, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.opts.SpillDir != "" && shouldSpillToDisk(c.opts) {
+		if err := c.flushLocked(); err != nil {
+			return ShiftResult{}, err
+		}
+	}
+	c.closeSpill()
+	sr := ShiftResult{
+		Shift:        c.shift,
+		spillPath:    c.spillPath,
+		outcomeCount: c.totalCount,
+	}
+	if c.spillPath == "" {
+		sr.Outcomes = append([]Outcome(nil), c.items...)
+	}
+	return sr, nil
+}
+
+func scanShift1(from, to int64, opts Options, tracker *scanTracker) (ShiftResult, error) {
+	collector := newOutcomeCollector(opts, 1)
 	workers := opts.workerCount()
 	jobs := make(chan int64)
 	var wg sync.WaitGroup
@@ -134,29 +214,34 @@ func scanShift1(from, to int64, opts Options, tracker *scanTracker) ([]Outcome, 
 					continue
 				}
 				out := evaluateShift(seed, state, opts, 1, shift1Prev, [4]int{}, [4]int{}, 0, board.PlayerLeftover{}, endLeft)
-				collector.add(out)
+				if err := collector.add(out); err != nil {
+					tracker.setErr(err)
+					return
+				}
 				tracker.finish(false)
 			}
 		}()
 	}
-	for _, seed := range seeds {
-		jobs <- seed
-	}
-	close(jobs)
+	go func() {
+		for seed := from; seed <= to; seed++ {
+			jobs <- seed
+		}
+		close(jobs)
+	}()
 	wg.Wait()
 	if err := tracker.error(); err != nil {
-		return nil, err
+		return ShiftResult{}, err
 	}
-	return collector.snapshot(), nil
+	return collector.finish()
 }
 
 type branchJob struct {
 	parent parentBoard
-	seed int64
+	seed   int64
 }
 
-func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options, tracker *scanTracker) ([]Outcome, error) {
-	collector := newOutcomeCollector()
+func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options, tracker *scanTracker) (ShiftResult, error) {
+	collector := newOutcomeCollector(opts, k)
 	workers := opts.workerCount()
 	work := make(chan branchJob)
 	var wg sync.WaitGroup
@@ -196,7 +281,10 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 					continue
 				}
 				out := evaluateShift(job.seed, base, opts, k, job.parent.prevFP, job.parent.demand, job.parent.damage, job.parent.emitterDamage, job.parent.leftover, endLeft)
-				collector.add(out)
+				if err := collector.add(out); err != nil {
+					tracker.setErr(err)
+					return
+				}
 				tracker.finish(false)
 			}
 		}()
@@ -211,7 +299,7 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 	}()
 	wg.Wait()
 	if err := tracker.error(); err != nil {
-		return nil, err
+		return ShiftResult{}, err
 	}
-	return collector.snapshot(), nil
+	return collector.finish()
 }

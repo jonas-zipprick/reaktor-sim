@@ -79,7 +79,7 @@ func TestRandomBoardsProduceHeat(t *testing.T) {
 }
 
 func TestBoardCellCount(t *testing.T) {
-	const want = 35
+	const want = 37
 	if len(hex.AllBoardCoords) != want {
 		t.Fatalf("expected %d cells, got %d", want, len(hex.AllBoardCoords))
 	}

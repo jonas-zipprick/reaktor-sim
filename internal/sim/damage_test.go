@@ -38,8 +38,8 @@ func TestVoltageAtTurbineDamagesWhenPlantEmpty(t *testing.T) {
 	cfg.ShiftDemands = board.ShiftDemands{}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
-		Pos:  hex.Coord{Q: 5, R: 4},
-		Dir:  hex.RotNW.TravelDir(),
+		Pos:  hex.Coord{Q: 5, R: 2},
+		Dir:  hex.RotW.TravelDir(),
 	}}
 
 	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(3)), cfg)

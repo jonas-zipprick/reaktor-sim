@@ -178,5 +178,5 @@ func abs(x int) int {
 const legendLineHeight = 15
 
 func legendBlockHeight() int {
-	return 18 + len(Legend())*legendLineHeight + 2*legendLineHeight + 16
+	return 18 + len(Legend())*legendLineHeight + len(WallLegendLines())*legendLineHeight + 2*legendLineHeight + 16
 }

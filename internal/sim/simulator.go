@@ -387,6 +387,12 @@ func (e *engine) resolve(chip Chip) {
 		return
 	}
 
+	if chip.Type == ChipVoltage && board.TurbinePlantWallLeave(chip.Pos, chip.Dir) {
+		if e.handlePlantWallLeave(chip) {
+			return
+		}
+	}
+
 	nextPos := chip.Pos.StepTarget(chip.Dir)
 
 	if nextPos.IsEmitter() {
@@ -516,21 +522,24 @@ func (e *engine) reflectOffWall(pos hex.Coord, dir int) int {
 func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
 	switch kind {
 	case hex.BoundaryInternalWall:
-		// The reactor wall (rows 1/3) is the Reaktoreigenbedarf border. Spannung
-		// can never enter player 1: it vanishes and reduces plant demand, or
-		// damages the plant zone when no demand is left.
-		if chip.Type == ChipVoltage && chip.Pos.IsPlayer2() {
-			if e.tryPlantDemand() {
-				e.recordStep(board.BorderDemandEvent(board.ZonePlant), &chip)
-				return
-			}
-			e.board.AddZoneDamage(board.ZonePlant)
-			e.recordStep(board.BorderDamageEvent(board.ZonePlant), &chip)
-			return
-		}
 		if chip.Type == ChipHeat {
 			event, active := e.processTurbine(chip)
 			e.recordStep(event, active)
+			return
+		}
+		if chip.Type == ChipVoltage {
+			if _, ok := board.PlantWallZone(chip.Pos, chip.Dir); ok {
+				if e.handlePlantWallLeave(chip) {
+					return
+				}
+			}
+			reflected := Chip{
+				Type: ChipVoltage,
+				Pos:  chip.Pos,
+				Dir:  e.reflectOffWall(chip.Pos, chip.Dir),
+			}
+			e.queue = append(e.queue, reflected)
+			e.recordStep("Spannungs-Reflektion", &reflected)
 			return
 		}
 		e.recordStep("Innere Wand", &chip)
@@ -543,7 +552,7 @@ func (e *engine) handleBlocked(chip Chip, kind hex.BoundaryKind) {
 func (e *engine) handleOuterBoundary(chip Chip) {
 	switch chip.Type {
 	case ChipHeat:
-		if chip.Pos.IsPlayer1() {
+		if hex.HeatReflectsAtOuterWall(chip.Pos, chip.Dir) {
 			reflected := Chip{
 				Type: ChipHeat,
 				Pos:  chip.Pos,
@@ -557,8 +566,14 @@ func (e *engine) handleOuterBoundary(chip Chip) {
 	case ChipNeutron:
 		e.recordStep("Neutron verpufft", &chip)
 	case ChipVoltage:
-		if !chip.Pos.IsPlayer2() {
-			e.recordStep("Spannung verpufft", &chip)
+		if hex.VoltageReflectsAtOuterWall(chip.Pos, chip.Dir) {
+			reflected := Chip{
+				Type: ChipVoltage,
+				Pos:  chip.Pos,
+				Dir:  hex.ReflectOffOuterWall(chip.Dir),
+			}
+			e.queue = append(e.queue, reflected)
+			e.recordStep("Spannungs-Reflektion", &reflected)
 			return
 		}
 		if z, ok := e.tryVoltageWallDelivery(chip.Pos, chip.Dir); ok {
@@ -567,6 +582,10 @@ func (e *engine) handleOuterBoundary(chip Chip) {
 		}
 		if z, ok := e.board.AddWallDamage(chip.Pos, chip.Dir, e.rng); ok {
 			e.recordStep(board.BorderDamageEvent(z), &chip)
+			return
+		}
+		if !chip.Pos.IsPlayer2() {
+			e.recordStep("Spannung verpufft", &chip)
 			return
 		}
 		e.recordStep("Spannung verpufft", &chip)
@@ -580,6 +599,19 @@ func (e *engine) tryVoltageWallDelivery(from hex.Coord, travelDir int) (board.Zo
 	}
 	e.res.ZoneDeliveries[z]++
 	return z, true
+}
+
+func (e *engine) handlePlantWallLeave(chip Chip) bool {
+	if z, ok := e.tryVoltageWallDelivery(chip.Pos, chip.Dir); ok {
+		e.recordStep(board.BorderDemandEvent(z), &chip)
+		return true
+	}
+	if z, ok := e.board.AddWallDamage(chip.Pos, chip.Dir, e.rng); ok {
+		e.recordStep(board.BorderDamageEvent(z), &chip)
+		return true
+	}
+	e.recordStep("Spannung verpufft", &chip)
+	return true
 }
 
 func (e *engine) tryPlantDemand() bool {
@@ -692,7 +724,28 @@ func emergencyGeneratorMayFire(e *engine) bool {
 	if !hasOutstandingDemand(e.board) {
 		return false
 	}
-	return !player1HeatLoose(e.queue)
+	if player1HeatLoose(e.queue) {
+		return false
+	}
+	return !otherVoltageOnBoard(e)
+}
+
+func otherVoltageOnBoard(e *engine) bool {
+	for _, c := range e.queue {
+		if c.Type == ChipVoltage {
+			return true
+		}
+	}
+	for _, c := range hex.AllBoardCoords {
+		t := &e.board.Tiles[c.Q][c.R]
+		switch t.Type {
+		case field.CapacitorBank, field.PumpedStorage, field.LeadAccumulator:
+			if t.StoredVoltage > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func hasOutstandingDemand(s *board.State) bool {
@@ -899,7 +952,13 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return []Chip{{Type: ChipVoltage, Pos: target, Dir: tile.SuperTarget.TravelDir()}}, false
 
 	case field.EmergencyGenerator:
-		return passThrough(chip, pos), false
+		if chip.Type != ChipVoltage {
+			return passThrough(chip, pos), false
+		}
+		if !tile.BurnedOut && tile.Charge > 0 {
+			return nil, false
+		}
+		return emitRandom(pos, rng, ChipVoltage, 1), false
 	}
 
 	return passThrough(chip, pos), false

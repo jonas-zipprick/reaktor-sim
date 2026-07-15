@@ -20,6 +20,7 @@ func TestScanSpillsResultsToDisk(t *testing.T) {
 		Shifts:     2,
 		ShiftKeep:  1,
 		SpillDir:   dir,
+		// Threshold 0 = always spill when SpillDir is set.
 	}
 	scan, err := seedsearch.Scan(1, 4, opts, nil)
 	if err != nil {
@@ -66,5 +67,32 @@ func TestScanWithoutSpillKeepsOutcomesInMemory(t *testing.T) {
 	}
 	if len(scan.Shifts[0].Outcomes) == 0 {
 		t.Fatal("expected in-memory outcomes")
+	}
+}
+
+func TestScanSpillSkippedWhenBelowMemoryThreshold(t *testing.T) {
+	dir := t.TempDir()
+	opts := seedsearch.Options{
+		Runs:                 2,
+		EnergyCard:           energy.DefaultCard(),
+		Finance:              finance.DefaultCard(),
+		Shifts:               2,
+		ShiftKeep:            1,
+		SpillDir:             dir,
+		SpillMemoryThreshold: ^uint64(0),
+	}
+	scan, err := seedsearch.Scan(1, 4, opts, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scan.Cleanup()
+
+	for _, sr := range scan.Shifts {
+		if len(sr.Outcomes) == 0 {
+			t.Fatalf("shift %d spilled despite high threshold", sr.Shift)
+		}
+		if _, err := os.Stat(filepath.Join(dir, fmt.Sprintf("shift%d.gob", sr.Shift))); err == nil {
+			t.Fatalf("shift %d spill file should not exist", sr.Shift)
+		}
 	}
 }

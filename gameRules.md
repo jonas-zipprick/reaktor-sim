@@ -5,11 +5,11 @@ Ein asymmetrisches, kooperatives Aufbau- und Kollisionsspiel für 2 Spieler.
 ## **0\. Das Spielfeld im Detail**
 | Column 1 (Player 1 Side) | Column 2 (Player 1 Side) | Column 3 (Player 1 Side) | Column 4 (Player 1 Side) | Column 5 (Player 1 Side) | Column 6 (Player 2 Side) | Column 7 (Player 2 Side) | Column 8 (Player 2 Side) | Column 9 (Player 2 Side) | 
 | :---- | :---: | :---: | :---: | :---: | :---: | :---- | :---: | :---: |
-| out-of-bounds | slot | slot | slot | out-of-bounds | slot (wired to reaktor and industrie) | slot (wired to industrie) | slot (wired to industrie) |
-| out-of-bounds | slot | slot | slot | slot (with wall to the right) | slot | slot | slot | slot (wired to wohnviertel) |
+| out-of-bounds | out-of-bounds | slot | slot | out-of-bounds | out-of-bounds | slot (North walls wired to industrie, West wall reflects) | slot (wired to industrie) | slot (wired to industrie) |
+| slot | slot | slot | slot (with p1 - p2 wall to the right) | slot  (NE wall reflects) | slot (NW wall reflects) | slot | slot | slot (wired to wohnviertel) |
 | Zünder | slot | slot | slot | Turbine (wired to Reaktorbedarf) | slot | slot | slot | slot (wired to wohnviertel) |
-| out-of-bounds | slot | slot | slot | slot (with wall on the right) | slot | slot | slot | slot (wired to Wohnviertel) |
-| out-of-bounds | slot | slot | slot | out-of-bounds | slot (wired to reaktor and Bahn) | slot (wired to Bahn) | slot (wired to Bahn) |
+| slot | slot | slot | slot (with p1 - p2 wall on the right) | slot (SE wall reflects) | slot (SW wall reflects) | slot | slot | slot (wired to Wohnviertel) |
+| out-of-bounds | out-of-bounds | slot | slot | out-of-bounds | out-of-bounds | slot (South walls wired to and Bahn, West Wall reflects) | slot (wired to Bahn) | slot (wired to Bahn) |
 
 ## **1\. Setting & Konzept**
 
@@ -215,7 +215,7 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * **Relais / Weiche (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Spannung im fixen Winkel ab.
 * **Erdung / Widerstand (Kosten: 1 Geld):** Leitet von der einen Seite eintreffende Spannung ab (vernichtet sie) während es die Spannung von der anderen Seite ungehindert durchfliegen lässt. Wichtig bei Überproduktion\!  
 * **Transformator (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
-* **Notgenerator (Kosten: 3 Geld | Ladung: 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, eine Ladung in eine gewünschte Richtung. Ist der Generator ausgebrannt, so leitet er einkommende Spannungschips in zufällige Richtungen weiter.
+* **Notgenerator (Kosten: 3 Geld | Ladung: 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, eine Ladung in eine gewünschte Richtung. Leitet einkommende Spannungschips in zufällige Richtungen weiter. Ist er noch geladen, so vernichtet er einkommende Spannung ohne sich aufzuladen.
 
 * **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 4 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum **Limit von 7 Chips** für die linke Spielhälfte.
 * **Blei-Akkumulator (Kosten: 3 Geld | Ladung: Maximal 2 Chip | ab 2\. Monat):** Wie Kondensator-Bank, aber verliert zu Begin der Schicht 1 Chip anstatt geleert zu werden. Bewege einen Chip auf ungebunden. Dieser Chip fliegt unkontrolliert in eine zufällige Richtung. Statt zu explodieren, werden einkommende Ladungschips in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  
