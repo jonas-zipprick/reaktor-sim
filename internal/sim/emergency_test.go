@@ -11,6 +11,40 @@ import (
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
 
+func TestEmergencyGeneratorFiresAlongOrientation(t *testing.T) {
+	pos := hex.Coord{Q: 6, R: 1}
+	s := board.NewEmpty()
+	s.Tiles[pos.Q][pos.R] = field.Tile{
+		Type:        field.EmergencyGenerator,
+		Charge:      1,
+		Orientation: hex.RotE,
+	}
+	s.ApplyDemands(board.ShiftDemands{Residential: 1})
+
+	cfg := sim.DefaultConfig()
+	cfg.EnergyCard = energy.Card{}
+	cfg.ShiftDemands = board.ShiftDemands{Residential: 1}
+	cfg.InitialChips = []sim.Chip{}
+
+	wantDir := hex.RotE.TravelDir()
+	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
+	for _, snap := range snaps {
+		if snap.Event != "Freiwilliger Schuss" {
+			continue
+		}
+		for _, c := range snap.Queue {
+			if c.Pos == pos && c.Type == sim.ChipVoltage {
+				if c.Dir != wantDir {
+					t.Fatalf("fired dir = %d (%s), want %d (%s)",
+						c.Dir, hex.DisplayDirName(c.Dir), wantDir, hex.DisplayDirName(wantDir))
+				}
+				return
+			}
+		}
+	}
+	t.Fatal("expected voluntary notgenerator shot")
+}
+
 func TestEmergencyGeneratorSurvivesVoltageHit(t *testing.T) {
 	pos := hex.Coord{Q: 6, R: 1}
 	s := board.NewEmpty()
@@ -27,8 +61,8 @@ func TestEmergencyGeneratorSurvivesVoltageHit(t *testing.T) {
 	if s.Tiles[pos.Q][pos.R].Type != field.EmergencyGenerator {
 		t.Fatalf("tile type = %v, want emergency generator", s.Tiles[pos.Q][pos.R].Type)
 	}
-	if got := s.Tiles[pos.Q][pos.R].Charge; got != 2 {
-		t.Fatalf("charge = %d, want 2 (incoming voltage must not add charge)", got)
+	if got := s.Tiles[pos.Q][pos.R].Charge; got != 1 {
+		t.Fatalf("charge = %d, want 1 (incoming voltage must not add charge)", got)
 	}
 	destroyed := false
 	for _, snap := range snaps {
@@ -103,8 +137,8 @@ func TestEmergencyGeneratorBurnsOutAfterVoluntaryFire(t *testing.T) {
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.EmergencyGenerator, 0, 0)
 	s.ApplyDemands(board.ShiftDemands{Residential: 1})
-	if s.Tiles[pos.Q][pos.R].Charge != 2 {
-		t.Fatalf("setup charge = %d, want 2", s.Tiles[pos.Q][pos.R].Charge)
+	if s.Tiles[pos.Q][pos.R].Charge != 1 {
+		t.Fatalf("setup charge = %d, want 1", s.Tiles[pos.Q][pos.R].Charge)
 	}
 
 	cfg := sim.DefaultConfig()
@@ -139,8 +173,8 @@ func TestEmergencyGeneratorNoVoluntaryFireWithoutDemand(t *testing.T) {
 	}}
 
 	sim.RunTrace(s, rand.New(rand.NewSource(7)), cfg)
-	if got := s.Tiles[pos.Q][pos.R].Charge; got != 2 {
-		t.Fatalf("charge = %d, want 2 (no fire without demand)", got)
+	if got := s.Tiles[pos.Q][pos.R].Charge; got != 1 {
+		t.Fatalf("charge = %d, want 1 (no fire without demand)", got)
 	}
 }
 

@@ -13,10 +13,14 @@ type Month struct {
 
 // CriticalLimit returns the geloest-chip limit per player half (default 7).
 func (m Month) CriticalLimit() int {
-	if m.FinanceID == "um-jeden-preis" {
+	switch m.EnergyID {
+	case "um-jeden-preis":
 		return 10
+	case "eroeffnungsfeier":
+		return 8
+	default:
+		return 7
 	}
-	return 7
 }
 
 // RepairsAllowed reports whether damage repair is funded this month.
@@ -37,17 +41,18 @@ func (m Month) FieldCost(t field.Type) int {
 	switch t {
 	case field.Transformer:
 		if m.EnergyID == "netzoptimierung" {
-			cost = 1
+			cost = 2
 		}
-	case field.UraniumPlate:
-		if m.EnergyID == "technologische-transformation" {
-			cost = 4
-		}
+	case field.CoalChamber:
 		if m.FinanceID == "schwerindustrie" {
 			cost--
 		}
 		if cost < 1 {
 			cost = 1
+		}
+	case field.UraniumPlate:
+		if m.EnergyID == "technologische-transformation" {
+			cost = 4
 		}
 	}
 	return cost

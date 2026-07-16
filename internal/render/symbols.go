@@ -63,7 +63,7 @@ func Label(state *board.State, c hex.Coord) string {
 	}
 
 	switch tile.Type {
-	case field.Mirror, field.Relay, field.CoolingTower, field.Ground:
+	case field.Mirror, field.Relay, field.CoolingTower, field.Ground, field.EmergencyGenerator:
 		return fmt.Sprintf("%s%d", base, tile.Orientation)
 	case field.Superconductor:
 		return fmt.Sprintf("%s%d", base, tile.SuperTarget)
@@ -118,7 +118,7 @@ func Legend() []string {
 	return []string{
 		"Zu = Zuender  Tu = Turbine (Schussrichtung pro Chip zufaellig: NO/O/SO)",
 		"au = ausgebrannt  Sp = Spiegel  Re = Relais  Su = Supraleiter  (leere Felder nur Umriss)",
-		"Rotation an Spiegel/Relais/Kuehlturm/Erdung/Su: NW, NE, E, SE, SW, W (im Uhrzeigersinn)",
+		"Rotation an Spiegel/Relais/Kuehlturm/Erdung/Notgenerator/Su: NW, NE, E, SE, SW, W (im Uhrzeigersinn)",
 		"Kh = Kohle  Ku = Kuehlturm  Eg = Erdgas  Ab = Absorber  Ur = Uran  Tk = Tokamak",
 		"Tr = Trafo  Er = Erdung  Ng = Notgenerator  Bl = Blei  Kd = Kondensator  Pu = Pumpspeicher  Hv = HV",
 		"Zahl darunter = Ladung gebunden (n/max, *=unendlich)",

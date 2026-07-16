@@ -23,7 +23,7 @@ func TestSimExportConfigNeedsEnergyCardForWins(t *testing.T) {
 	full := sim.DefaultConfig()
 	full.EnergyCard = card
 	full.FinanceCard = fin
-	full.CriticalLimit = fin.CriticalLimit()
+	full.CriticalLimit = card.CriticalLimit()
 	full.Shift = 2
 	full.ShiftDemands = demands
 

@@ -152,6 +152,14 @@ func addFlowChip(g *Graph, chip InFlight) {
 }
 
 func flowTarget(from hex.Coord, dir int, particle ParticleType) (hex.Coord, bool) {
+	if particle == Voltage && hex.VoltageReflectsAtOuterWall(from, dir) {
+		refDir := hex.ReflectOffOuterWall(dir)
+		refNext := from.Neighbor(refDir)
+		if hex.CanEnter(from, refNext) {
+			return refNext, true
+		}
+		return hex.Coord{}, false
+	}
 	next := from.StepTarget(dir)
 	if hex.CanEnter(from, next) {
 		return next, true

@@ -12,7 +12,7 @@ import (
 
 func TestSpendShiftBudgetRespectsMonthFilter(t *testing.T) {
 	s := board.NewEmpty()
-	if _, err := board.SpendShiftBudget(rand.New(rand.NewSource(42)), s, 0, 8, 2, rules.Month{}); err != nil {
+	if _, err := board.SpendShiftBudget(rand.New(rand.NewSource(42)), s, 0, 8, 2, 0, rules.Month{}); err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range hex.AllBoardCoords {
@@ -30,7 +30,7 @@ func TestSpendShiftBudgetRespectsMonthFilter(t *testing.T) {
 }
 
 func TestRandomWithPlayerCostsRespectsMonthFilter(t *testing.T) {
-	s, _, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(7)), 6, 6, 2, rules.Month{})
+	s, _, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(7)), 6, 6, 2, 0, rules.Month{})
 	if err != nil {
 		t.Fatal(err)
 	}

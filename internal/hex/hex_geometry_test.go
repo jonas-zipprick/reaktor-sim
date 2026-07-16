@@ -10,8 +10,8 @@ func TestBoardGeometryMatchesGameRules(t *testing.T) {
 	if hex.Rows != 5 || hex.Cols != 9 {
 		t.Fatalf("board size = %dx%d, want 9x5", hex.Cols, hex.Rows)
 	}
-	if len(hex.AllBoardCoords) != 37 {
-		t.Fatalf("valid cells = %d, want 37", len(hex.AllBoardCoords))
+	if len(hex.AllBoardCoords) != 41 {
+		t.Fatalf("valid cells = %d, want 41", len(hex.AllBoardCoords))
 	}
 
 	placeable := 0
@@ -21,28 +21,28 @@ func TestBoardGeometryMatchesGameRules(t *testing.T) {
 		}
 		placeable++
 	}
-	if placeable != 35 {
-		t.Fatalf("placeable slots = %d, want 35", placeable)
+	if placeable != 39 {
+		t.Fatalf("placeable slots = %d, want 39", placeable)
 	}
 
-	// Slots beside the emitter (above/below in column 1, NE/SE in column 2).
+	// Slots beside the emitter, including column-2 top/bottom extension rows.
 	for _, c := range []hex.Coord{
 		{Q: 0, R: 1},
 		{Q: 0, R: 3},
+		{Q: 1, R: 0},
 		{Q: 1, R: 1},
 		{Q: 1, R: 3},
+		{Q: 1, R: 4},
 	} {
 		if !c.Valid() || c.Kind() != hex.CellSlot {
-			t.Fatalf("(%d,%d) should be a slot beside the emitter", c.Q, c.R)
+			t.Fatalf("(%d,%d) should be a slot", c.Q, c.R)
 		}
 	}
 
-	// Column 1 and 2 extension rows stay out of bounds.
+	// Column 1 extension rows stay out of bounds.
 	for _, c := range []hex.Coord{
 		{Q: 0, R: 0},
 		{Q: 0, R: 4},
-		{Q: 1, R: 0},
-		{Q: 1, R: 4},
 	} {
 		if c.Valid() {
 			t.Fatalf("(%d,%d) should be out of bounds", c.Q, c.R)
@@ -57,11 +57,11 @@ func TestBoardGeometryMatchesGameRules(t *testing.T) {
 		}
 	}
 
-	// Column 6 extension rows are out of bounds.
+	// Column 6 (Q=5) top/bottom extension rows are slots.
 	for _, r := range []int{0, hex.Rows - 1} {
 		c := hex.Coord{Q: 5, R: r}
-		if c.Valid() {
-			t.Fatalf("(%d,%d) should be out of bounds", c.Q, c.R)
+		if !c.Valid() || c.Kind() != hex.CellSlot {
+			t.Fatalf("(%d,%d) should be a slot", c.Q, c.R)
 		}
 	}
 

@@ -100,7 +100,6 @@ func main() {
 		topSimCharts: *topSimCharts,
 	}
 
-	removeSpill := false
 	if *spillDir == "" && *shifts > 1 {
 		if *chartsDir != "" {
 			*spillDir = filepath.Join(*chartsDir, ".spill")
@@ -110,7 +109,6 @@ func main() {
 			if err != nil {
 				log.Fatalf("Spill-Verzeichnis: %v", err)
 			}
-			removeSpill = true
 		}
 	}
 	opts.SpillDir = *spillDir
@@ -149,6 +147,13 @@ func main() {
 		d := energyCard.ShiftDemands(k)
 		fmt.Fprintf(out, "  Schicht %d Bedarf: I=%d W=%d b=%d R=%d\n", k, d.Industry, d.Residential, d.Rail, d.Plant)
 	}
+
+	if *chartsDir != "" {
+		if err := prepareChartsDir(*chartsDir); err != nil {
+			log.Fatalf("Ausgabeverzeichnis vorbereiten: %v", err)
+		}
+	}
+
 	start := time.Now()
 
 	var bar *progress.Bar
@@ -167,13 +172,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if removeSpill {
-		defer func() {
-			if err := scan.Cleanup(); err != nil {
-				log.Printf("Spill-Verzeichnis aufraeumen: %v", err)
-			}
-		}()
-	}
 	if bar != nil {
 		bar.Finish()
 	}
@@ -191,9 +189,6 @@ func main() {
 	}
 
 	if *chartsDir != "" {
-		if err := prepareChartsDir(*chartsDir); err != nil {
-			log.Fatalf("Ausgabeverzeichnis vorbereiten: %v", err)
-		}
 		if err := writeCharts(*chartsDir, scan, *runs); err != nil {
 			log.Fatal(err)
 		}
@@ -222,6 +217,12 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Printf("Report: %s\n", reportPath)
+	}
+
+	if opts.SpillDir != "" {
+		if err := scan.Cleanup(); err != nil {
+			log.Printf("Spill-Verzeichnis aufraeumen: %v", err)
+		}
 	}
 }
 

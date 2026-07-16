@@ -56,16 +56,32 @@ func TestBoardWallEdgesVoltageReflect(t *testing.T) {
 		c   hex.Coord
 		dir hex.Rotation
 	}{
-		{hex.Coord{Q: 6, R: 0}, hex.RotW},
-		{hex.Coord{Q: 6, R: 4}, hex.RotW},
-		{hex.Coord{Q: 4, R: 1}, hex.RotNE},
-		{hex.Coord{Q: 5, R: 1}, hex.RotNW},
-		{hex.Coord{Q: 4, R: 3}, hex.RotSE},
-		{hex.Coord{Q: 5, R: 3}, hex.RotSW},
+		{hex.Coord{Q: 5, R: 0}, hex.RotNE},
+		{hex.Coord{Q: 5, R: 0}, hex.RotNW},
+		{hex.Coord{Q: 5, R: 0}, hex.RotW},
+		{hex.Coord{Q: 5, R: 4}, hex.RotW},
+		{hex.Coord{Q: 5, R: 4}, hex.RotSW},
+		{hex.Coord{Q: 5, R: 4}, hex.RotSE},
 	}
 	for _, tc := range cases {
 		if !hasWall(edges, tc.c, tc.dir.TravelDir(), wallReflectVoltage) {
 			t.Fatalf("(%d,%d) dir %s missing voltage reflect wall", tc.c.Q, tc.c.R, tc.dir)
+		}
+	}
+	forbidden := []struct {
+		c   hex.Coord
+		dir hex.Rotation
+	}{
+		{hex.Coord{Q: 5, R: 0}, hex.RotE},
+		{hex.Coord{Q: 5, R: 0}, hex.RotSW},
+		{hex.Coord{Q: 5, R: 4}, hex.RotE},
+		{hex.Coord{Q: 5, R: 4}, hex.RotNW},
+		{hex.Coord{Q: 6, R: 0}, hex.RotW},
+		{hex.Coord{Q: 4, R: 1}, hex.RotNE},
+	}
+	for _, tc := range forbidden {
+		if hasWall(edges, tc.c, tc.dir.TravelDir(), wallReflectVoltage) {
+			t.Fatalf("(%d,%d) dir %s should not have voltage reflect wall", tc.c.Q, tc.c.R, tc.dir)
 		}
 	}
 }

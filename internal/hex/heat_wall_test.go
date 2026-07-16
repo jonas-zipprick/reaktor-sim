@@ -31,10 +31,10 @@ func TestHeatReflectsAtIgniterIndent(t *testing.T) {
 		c   Coord
 		dir Rotation
 	}{
-		{Coord{Q: 1, R: 1}, RotNW},
-		{Coord{Q: 1, R: 3}, RotSW},
 		{Coord{Q: 0, R: 1}, RotNW},
 		{Coord{Q: 0, R: 3}, RotSW},
+		{Coord{Q: 1, R: 0}, RotNW},
+		{Coord{Q: 1, R: 4}, RotSW},
 	}
 	for _, tc := range cases {
 		if !HeatReflectsAtOuterWall(tc.c, tc.dir.TravelDir()) {

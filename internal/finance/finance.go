@@ -20,22 +20,17 @@ type Card struct {
 var Cards = []Card{
 	{
 		ID: "schwerindustrie", Name: "Triumph der Schwerindustrie",
-		ReactorBudget: 3, GridBudget: 4,
-		SpecialRule: "Uran ist um 1 Geld guenstiger",
+		ReactorBudget: 3, GridBudget: 3,
+		SpecialRule: "Kohle ist um 1 Geld guenstiger",
 	},
 	{
 		ID: "sparmassnahmen", Name: "Nationale Sparmaßnahmen",
-		ReactorBudget: 2, GridBudget: 2,
+		ReactorBudget: 3, GridBudget: 2,
 	},
 	{
 		ID: "wettruesten", Name: "Nukleares Wettrüsten",
-		ReactorBudget: 2, GridBudget: 4,
+		ReactorBudget: 4, GridBudget: 2,
 		SpecialRule: "Reparaturen nicht bewilligt; ausgebrannte Felder duerfen ueberbaut werden",
-	},
-	{
-		ID: "um-jeden-preis", Name: "Um jeden Preis",
-		ReactorBudget: 2, GridBudget: 2,
-		SpecialRule: "Kritische Masse liegt bei 10 statt 7 Chips",
 	},
 }
 
@@ -58,14 +53,6 @@ func ByID(id string) (Card, bool) {
 // RepairsAllowed reports whether leftover money may be spent on damage repair.
 func (c Card) RepairsAllowed() bool {
 	return c.ID != "wettruesten"
-}
-
-// CriticalLimit returns the geloest-chip limit per player half for this month.
-func (c Card) CriticalLimit() int {
-	if c.ID == "um-jeden-preis" {
-		return 10
-	}
-	return 7
 }
 
 // Describe formats card name and per-shift budget for logging.

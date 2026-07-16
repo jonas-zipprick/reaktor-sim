@@ -174,6 +174,11 @@ func fillSlotCosts(rng *rand.Rand, s *State, slots []hex.Coord, target int, labe
 	if target == 0 {
 		return nil
 	}
+	// Shuffle so low budgets don't always spend on early row-major edge slots.
+	slots = append([]hex.Coord(nil), slots...)
+	rng.Shuffle(len(slots), func(i, j int) {
+		slots[i], slots[j] = slots[j], slots[i]
+	})
 	planner, err := newCostPlanner(slots, monthFilter, month)
 	if err != nil {
 		return err
@@ -334,7 +339,8 @@ func placeTile(s *State, c hex.Coord, t field.Type, rng *rand.Rand, month rules.
 	if t == field.Superconductor {
 		superTarget = hex.RandomRotation(rng)
 	}
-	if t == field.Relay || t == field.Mirror || t == field.CoolingTower || t == field.Ground {
+	if t == field.Relay || t == field.Mirror || t == field.CoolingTower ||
+		t == field.Ground || t == field.EmergencyGenerator {
 		orient = hex.RandomRotation(rng)
 	}
 	s.Tiles[c.Q][c.R] = field.NewTile(t, orient, superTarget)

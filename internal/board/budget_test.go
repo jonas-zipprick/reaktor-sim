@@ -12,7 +12,7 @@ func TestRandomWithPlayerCostsCanLeaveLeftover(t *testing.T) {
 	const budget = 6
 	seenLeftover := false
 	for seed := int64(1); seed <= 200; seed++ {
-		_, left, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(seed)), budget, 0, 0, rules.Month{})
+		_, left, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(seed)), budget, 0, 0, 0, rules.Month{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -28,7 +28,7 @@ func TestRandomWithPlayerCostsCanLeaveLeftover(t *testing.T) {
 
 func TestSpendShiftBudgetReturnsLeftover(t *testing.T) {
 	s := board.NewEmpty()
-	left, err := board.SpendShiftBudget(rand.New(rand.NewSource(99)), s, 3, 0, 0, rules.Month{})
+	left, err := board.SpendShiftBudget(rand.New(rand.NewSource(99)), s, 3, 0, 0, 0, rules.Month{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestSpendShiftBudgetReservesRepairMoneyWhenHighDamage(t *testing.T) {
 	const runs = 300
 	for i := 0; i < runs; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, month)
+		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func TestSpendShiftBudgetReservesEmitterRepairOnTotalBoardDamage(t *testing.T) {
 	const runs = 300
 	for i := 0; i < runs; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 6, 0, 0, month)
+		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 6, 0, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +90,7 @@ func TestSpendShiftBudgetNoRepairReserveWhenTotalDamageLow(t *testing.T) {
 	const runs = 300
 	for i := 0; i < runs; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, month)
+		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -111,7 +111,7 @@ func TestSpendShiftBudgetRepairHeuristicDisabledWithoutRepairs(t *testing.T) {
 	const runs = 300
 	for i := 0; i < runs; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, month)
+		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,5 +120,42 @@ func TestSpendShiftBudgetRepairHeuristicDisabledWithoutRepairs(t *testing.T) {
 	avg := totalLeft / runs
 	if avg < 3 || avg > 5 {
 		t.Fatalf("avg leftover %.2f without repairs allowed, want ~4 (uniform)", avg)
+	}
+}
+
+func TestRandomWithPlayerCostsMinFirstShiftFieldSpend(t *testing.T) {
+	const budget = 6
+	for seed := int64(1); seed <= 200; seed++ {
+		_, left, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(seed)), budget, budget, 0, board.MinFirstShiftFieldSpend, rules.Month{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		spentP1 := budget - left.Player1
+		spentP2 := budget - left.Player2
+		if spentP1 < board.MinFirstShiftFieldSpend {
+			t.Fatalf("seed %d: P1 spent %d Geld, want >= %d", seed, spentP1, board.MinFirstShiftFieldSpend)
+		}
+		if spentP2 < board.MinFirstShiftFieldSpend {
+			t.Fatalf("seed %d: P2 spent %d Geld, want >= %d", seed, spentP2, board.MinFirstShiftFieldSpend)
+		}
+	}
+}
+
+func TestSpendShiftBudgetMinFirstShiftFieldSpend(t *testing.T) {
+	const budget = 5
+	for seed := int64(1); seed <= 200; seed++ {
+		s := board.NewEmpty()
+		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(seed)), s, budget, budget, 0, board.MinFirstShiftFieldSpend, rules.Month{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		spentP1 := budget - left.Player1
+		spentP2 := budget - left.Player2
+		if spentP1 < board.MinFirstShiftFieldSpend {
+			t.Fatalf("seed %d: P1 spent %d Geld, want >= %d", seed, spentP1, board.MinFirstShiftFieldSpend)
+		}
+		if spentP2 < board.MinFirstShiftFieldSpend {
+			t.Fatalf("seed %d: P2 spent %d Geld, want >= %d", seed, spentP2, board.MinFirstShiftFieldSpend)
+		}
 	}
 }

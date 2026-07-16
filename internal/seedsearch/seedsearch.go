@@ -236,7 +236,7 @@ func prepareShift1Board(rng *rand.Rand, opts Options) (*board.State, board.Playe
 func spendShift1Budget(rng *rand.Rand, state *board.State, opts Options, month rules.Month) (board.PlayerLeftover, error) {
 	p1 := opts.Finance.ReactorBudget
 	p2 := opts.Finance.GridBudget
-	return board.SpendShiftBudget(rng, state, p1, p2, opts.MonthFilter, month)
+	return board.SpendShiftBudget(rng, state, p1, p2, opts.MonthFilter, board.MinFirstShiftFieldSpend, month)
 }
 
 // buildInitialBoard creates the shift-1 board using the finance budget.
@@ -246,7 +246,7 @@ func buildInitialBoard(rng *rand.Rand, opts Options) (*board.State, board.Player
 	if p1 <= 0 && p2 <= 0 {
 		return board.Random(rng, opts.MonthFilter), board.PlayerLeftover{}, nil
 	}
-	state, left, err := board.RandomWithPlayerCosts(rng, p1, p2, opts.MonthFilter, rules.Month{
+	state, left, err := board.RandomWithPlayerCosts(rng, p1, p2, opts.MonthFilter, board.MinFirstShiftFieldSpend, rules.Month{
 		EnergyID:  opts.EnergyCard.ID,
 		FinanceID: opts.Finance.ID,
 	})
@@ -270,7 +270,7 @@ func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options,
 			budgetP1 := opts.Finance.ReactorBudget + carryLeft.Player1
 			budgetP2 := opts.Finance.GridBudget + carryLeft.Player2
 			var err error
-			endLeft, err = board.SpendShiftBudget(rng, state, budgetP1, budgetP2, opts.MonthFilter, rules.Month{
+			endLeft, err = board.SpendShiftBudget(rng, state, budgetP1, budgetP2, opts.MonthFilter, 0, rules.Month{
 				EnergyID:  opts.EnergyCard.ID,
 				FinanceID: opts.Finance.ID,
 			})
@@ -305,7 +305,7 @@ func evaluateShift(seed int64, state *board.State, opts Options, shift int, prev
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = opts.EnergyCard
 	cfg.FinanceCard = opts.Finance
-	cfg.CriticalLimit = opts.Finance.CriticalLimit()
+	cfg.CriticalLimit = opts.EnergyCard.CriticalLimit()
 	cfg.Shift = shift
 	cfg.RandomShift = false
 	cfg.ShiftDemands = combined
@@ -328,7 +328,8 @@ func evaluateShift(seed int64, state *board.State, opts Options, shift int, prev
 
 func evaluatePrepared(seed int64, state *board.State, runs int, cfg sim.Config, endLeft board.PlayerLeftover) Outcome {
 	results := sim.RunMonteCarlo(state, runs, seed, cfg)
-	out := aggregateOutcome(seed, state, runs, cfg.ReactorRepairBudget, cfg.RepairBudget, endLeft, results)
+	month := rules.Month{EnergyID: cfg.EnergyCard.ID, FinanceID: cfg.FinanceCard.ID}
+	out := aggregateOutcome(seed, state, runs, cfg.ReactorRepairBudget, cfg.RepairBudget, endLeft, results, month)
 	if runs > 0 {
 		if loops := sim.LoopTraceRunIndices(results, 1); len(loops) > 0 {
 			out.TraceLoopRun = loops[0]
@@ -343,11 +344,11 @@ func evaluatePrepared(seed int64, state *board.State, runs int, cfg sim.Config, 
 	return out
 }
 
-func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget, gridRepairBudget int, endLeft board.PlayerLeftover, results []sim.Result) Outcome {
+func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget, gridRepairBudget int, endLeft board.PlayerLeftover, results []sim.Result, month rules.Month) Outcome {
 	out := Outcome{
 		Seed:                seed,
 		BoardFingerprint:    board.Fingerprint(state),
-		BoardCosts:          state.PlayerCosts(),
+		BoardCosts:          state.PlayerCostsFor(month),
 		Runs:                runs,
 		ReactorRepairBudget: reactorRepairBudget,
 		RepairBudget:        gridRepairBudget,

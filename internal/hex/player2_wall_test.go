@@ -6,7 +6,32 @@ import (
 	"github.com/jonas/reaktor-sim/internal/hex"
 )
 
-func TestVoltageReflectsAtMarkedOuterWalls(t *testing.T) {
+func TestVoltageReflectsAtCol6ExtensionOuterEdges(t *testing.T) {
+	cases := []struct {
+		c    hex.Coord
+		dirs []hex.Rotation
+	}{
+		{hex.Coord{Q: 5, R: 0}, []hex.Rotation{hex.RotNE, hex.RotNW, hex.RotW}},
+		{hex.Coord{Q: 5, R: 4}, []hex.Rotation{hex.RotW, hex.RotSW, hex.RotSE}},
+	}
+	for _, tc := range cases {
+		want := map[int]bool{}
+		for _, d := range tc.dirs {
+			want[d.TravelDir()] = true
+		}
+		for dir := 0; dir < 6; dir++ {
+			got := hex.VoltageReflectsAtOuterWall(tc.c, dir)
+			if want[dir] && !got {
+				t.Fatalf("(%d,%d) dir %s should reflect", tc.c.Q, tc.c.R, hex.DisplayDirName(dir))
+			}
+			if !want[dir] && got {
+				t.Fatalf("(%d,%d) dir %s must not reflect", tc.c.Q, tc.c.R, hex.DisplayDirName(dir))
+			}
+		}
+	}
+}
+
+func TestVoltageDoesNotReflectFormerNotchWallsIntoExtensionSlots(t *testing.T) {
 	cases := []struct {
 		pos hex.Coord
 		dir hex.Rotation
@@ -14,13 +39,11 @@ func TestVoltageReflectsAtMarkedOuterWalls(t *testing.T) {
 		{hex.Coord{Q: 6, R: 0}, hex.RotW},
 		{hex.Coord{Q: 6, R: 4}, hex.RotW},
 		{hex.Coord{Q: 4, R: 1}, hex.RotNE},
-		{hex.Coord{Q: 5, R: 1}, hex.RotNW},
 		{hex.Coord{Q: 4, R: 3}, hex.RotSE},
-		{hex.Coord{Q: 5, R: 3}, hex.RotSW},
 	}
 	for _, tc := range cases {
-		if !hex.VoltageReflectsAtOuterWall(tc.pos, tc.dir.TravelDir()) {
-			t.Fatalf("(%d,%d) dir %s should reflect", tc.pos.Q, tc.pos.R, tc.dir)
+		if hex.VoltageReflectsAtOuterWall(tc.pos, tc.dir.TravelDir()) {
+			t.Fatalf("(%d,%d) dir %s must not reflect into extension slots", tc.pos.Q, tc.pos.R, tc.dir)
 		}
 	}
 }

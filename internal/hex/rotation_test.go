@@ -53,10 +53,30 @@ func TestDisplayDirName(t *testing.T) {
 	}
 }
 
-func TestEmitterShotSoutheast(t *testing.T) {
-	next := hex.EmitterShotTarget(hex.RotSE.TravelDir())
-	if next != (hex.Coord{Q: 1, R: 3}) {
-		t.Fatalf("SE from emitter: got (%d,%d) want (1,3)", next.Q, next.R)
+func TestEmitterShotTargetsAreEdgeNeighbors(t *testing.T) {
+	cases := []struct {
+		dir  int
+		want hex.Coord
+	}{
+		{hex.RotNE.TravelDir(), hex.Coord{Q: 0, R: 1}},
+		{hex.RotE.TravelDir(), hex.Coord{Q: 1, R: 2}},
+		{hex.RotSE.TravelDir(), hex.Coord{Q: 0, R: 3}},
+	}
+	emitter := hex.Coord{Q: hex.EmitterCol, R: hex.EmitterRow}
+	for _, tc := range cases {
+		got := hex.EmitterShotTarget(tc.dir)
+		if got != tc.want {
+			t.Fatalf("%s: EmitterShotTarget = (%d,%d), want (%d,%d)",
+				hex.DisplayDirName(tc.dir), got.Q, got.R, tc.want.Q, tc.want.R)
+		}
+		if step := emitter.StepTarget(tc.dir); step != tc.want {
+			t.Fatalf("%s: StepTarget = (%d,%d), want (%d,%d)",
+				hex.DisplayDirName(tc.dir), step.Q, step.R, tc.want.Q, tc.want.R)
+		}
+		if step := emitter.Neighbor(tc.dir); step != tc.want {
+			t.Fatalf("%s: Neighbor = (%d,%d), want edge neighbor (%d,%d)",
+				hex.DisplayDirName(tc.dir), step.Q, step.R, tc.want.Q, tc.want.R)
+		}
 	}
 }
 

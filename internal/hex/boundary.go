@@ -29,25 +29,11 @@ func ReflectOffOuterWall(dir int) int {
 }
 
 // VoltageReflectsAtOuterWall reports whether a voltage chip at from moving in dir
-// should bounce off a reflective outer wall (gameRules.md field layout).
+// should bounce off a reflective wall (gameRules.md field layout).
+// Extension-row slots (5,0)/(5,4) reflect on every edge that faces out-of-bounds.
 func VoltageReflectsAtOuterWall(from Coord, dir int) bool {
-	next := from.Neighbor(dir)
-	if BlockedBoundary(from, next, dir) != BoundaryOuter {
-		return false
-	}
-	switch {
-	case from.Q == 6 && from.R == 0 && dir == RotW.TravelDir():
-		return true
-	case from.Q == 6 && from.R == Rows-1 && dir == RotW.TravelDir():
-		return true
-	case from.Q == 4 && from.R == 1 && dir == RotNE.TravelDir():
-		return true
-	case from.Q == 5 && from.R == 1 && dir == RotNW.TravelDir():
-		return true
-	case from.Q == 4 && from.R == 3 && dir == RotSE.TravelDir():
-		return true
-	case from.Q == 5 && from.R == 3 && dir == RotSW.TravelDir():
-		return true
+	if from.Q == 5 && (from.R == 0 || from.R == Rows-1) {
+		return !from.Neighbor(normalizeRot(dir)).Valid()
 	}
 	return false
 }

@@ -9,8 +9,8 @@ import (
 
 func TestPlaceableSlots(t *testing.T) {
 	slots := PlaceableSlots()
-	if len(slots) != 35 {
-		t.Fatalf("expected 35 slots, got %d", len(slots))
+	if len(slots) != 39 {
+		t.Fatalf("expected 39 slots, got %d", len(slots))
 	}
 }
 

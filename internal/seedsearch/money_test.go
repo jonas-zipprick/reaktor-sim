@@ -12,19 +12,14 @@ func TestLeftoverCarriesBetweenShifts(t *testing.T) {
 	fin, _ := finance.ByID("schwerindustrie")
 	card, _ := energy.ByID("eroeffnungsfeier")
 	opts := seedsearch.Options{
-		Runs: 20, EnergyCard: card, Finance: fin, Shifts: 5, ShiftKeep: 3, MonthFilter: 1,
+		Runs: 20, EnergyCard: card, Finance: fin, Shifts: 5, MonthFilter: 1,
 	}
-	scan, err := seedsearch.Scan(46056, 46056, opts, nil)
+	chain, err := seedsearch.EvaluateChain(7, opts)
 	if err != nil {
 		t.Fatal(err)
 	}
-	last := scan.Shifts[len(scan.Shifts)-1]
-	if len(last.Outcomes) == 0 {
-		t.Fatal("no shift-5 outcomes")
-	}
-	chain, err := seedsearch.TraceChain(scan, last.Outcomes[0], card)
-	if err != nil {
-		t.Fatal(err)
+	if len(chain) != 5 {
+		t.Fatalf("chain length = %d, want 5", len(chain))
 	}
 	for i := 1; i < len(chain); i++ {
 		prev, cur := chain[i-1], chain[i]

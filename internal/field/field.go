@@ -53,7 +53,7 @@ var Catalog = map[Type]Info{
 	Relay:              {Name: "Relais/Weiche", Cost: 1, Sector: "grid"},
 	Transformer:        {Name: "Transformator", Cost: 3, InitialCharge: 6, MaxCharge: 6, Sector: "grid"},
 	Ground:             {Name: "Erdung/Widerstand", Cost: 1, Sector: "grid"},
-	EmergencyGenerator: {Name: "Notgenerator", Cost: 3, InitialCharge: 2, MaxCharge: 2, Sector: "grid"},
+	EmergencyGenerator: {Name: "Notgenerator", Cost: 2, InitialCharge: 1, MaxCharge: 1, Sector: "grid"},
 	LeadAccumulator:    {Name: "Blei-Akkumulator", Cost: 3, MaxCharge: 2, Sector: "grid", AvailableFromMonth: 2},
 	CapacitorBank:      {Name: "Kondensator-Bank", Cost: 4, MaxCharge: 5, Sector: "grid", AvailableFromMonth: 2},
 	PumpedStorage:      {Name: "Pumpspeicherwerk", Cost: 4, MaxCharge: 5, Sector: "grid", AvailableFromMonth: 3},
@@ -117,5 +117,6 @@ func (t *Tile) Cost() int {
 
 // HasRotation reports whether a placed field's facing affects simulation.
 func HasRotation(t Type) bool {
-	return t == Mirror || t == Relay || t == CoolingTower || t == Ground || t == Superconductor
+	return t == Mirror || t == Relay || t == CoolingTower || t == Ground ||
+		t == EmergencyGenerator || t == Superconductor
 }

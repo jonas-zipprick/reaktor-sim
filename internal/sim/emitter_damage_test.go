@@ -32,6 +32,7 @@ func TestEmitterDamageCountsTowardCriticalMass(t *testing.T) {
 	s := board.NewEmpty()
 	s.EmitterDamage = 8
 	cfg := sim.DefaultConfig()
+	cfg.CriticalLimit = 7
 	cfg.ShiftDemands = board.ShiftDemands{}
 	cfg.InitialChips = []sim.Chip{}
 

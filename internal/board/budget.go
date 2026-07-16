@@ -16,9 +16,14 @@ type PlayerLeftover struct {
 	Player2 int
 }
 
+// MinFirstShiftFieldSpend is the minimum Geld each player spends on field
+// purchases in shift 1 (strategy heuristic).
+const MinFirstShiftFieldSpend = 2
+
 // RandomWithPlayerCosts builds a board spending a random achievable amount up to
 // each player's budget. A budget of 0 leaves that half empty.
-func RandomWithPlayerCosts(rng *rand.Rand, budgetP1, budgetP2, monthFilter int, month rules.Month) (*State, PlayerLeftover, error) {
+// minFieldSpend, when positive and affordable, forces at least that much field spend.
+func RandomWithPlayerCosts(rng *rand.Rand, budgetP1, budgetP2, monthFilter, minFieldSpend int, month rules.Month) (*State, PlayerLeftover, error) {
 	if budgetP1 < 0 || budgetP2 < 0 {
 		return nil, PlayerLeftover{}, fmt.Errorf("Brett-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
 	}
@@ -28,11 +33,11 @@ func RandomWithPlayerCosts(rng *rand.Rand, budgetP1, budgetP2, monthFilter int, 
 
 	s := NewEmpty()
 	ApplyRandomShiftRotations(rng, s)
-	left1, err := spendUpToOnSlots(rng, s, slotsForPlayer(true), budgetP1, "Spieler 1 (Reaktor)", monthFilter, month)
+	left1, err := spendUpToOnSlots(rng, s, slotsForPlayer(true), budgetP1, "Spieler 1 (Reaktor)", monthFilter, minFieldSpend, month)
 	if err != nil {
 		return nil, PlayerLeftover{}, err
 	}
-	left2, err := spendUpToOnSlots(rng, s, slotsForPlayer(false), budgetP2, "Spieler 2 (Stromnetz)", monthFilter, month)
+	left2, err := spendUpToOnSlots(rng, s, slotsForPlayer(false), budgetP2, "Spieler 2 (Stromnetz)", monthFilter, minFieldSpend, month)
 	if err != nil {
 		return nil, PlayerLeftover{}, err
 	}
@@ -46,25 +51,33 @@ const (
 
 // SpendShiftBudget spends up to the given per-player budgets on an existing board.
 // It returns the unspent remainder per half.
+// minFieldSpend, when positive and affordable, forces at least that much field spend.
 // When s carries more than damageRepairThreshold total damage chips and repairs
 // are allowed, most draws reserve money for repairs on the affected half.
-func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2, monthFilter int, month rules.Month) (PlayerLeftover, error) {
+func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2, monthFilter, minFieldSpend int, month rules.Month) (PlayerLeftover, error) {
 	if budgetP1 < 0 || budgetP2 < 0 {
 		return PlayerLeftover{}, fmt.Errorf("Schicht-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
 	}
 	ApplyRandomShiftRotations(rng, s)
-	left1, err := spendHalfBudget(rng, s, true, budgetP1, monthFilter, month)
+	left1, err := spendHalfBudget(rng, s, true, budgetP1, monthFilter, minFieldSpend, month)
 	if err != nil {
 		return PlayerLeftover{}, err
 	}
-	left2, err := spendHalfBudget(rng, s, false, budgetP2, monthFilter, month)
+	left2, err := spendHalfBudget(rng, s, false, budgetP2, monthFilter, minFieldSpend, month)
 	if err != nil {
 		return PlayerLeftover{}, err
 	}
 	return PlayerLeftover{Player1: left1, Player2: left2}, nil
 }
 
-func spendUpToOnSlots(rng *rand.Rand, s *State, slots []hex.Coord, maxBudget int, label string, monthFilter int, month rules.Month) (int, error) {
+func effectiveMinFieldSpend(minFieldSpend, budget int) int {
+	if minFieldSpend <= 0 || budget <= 0 || budget < minFieldSpend {
+		return 0
+	}
+	return minFieldSpend
+}
+
+func spendUpToOnSlots(rng *rand.Rand, s *State, slots []hex.Coord, maxBudget int, label string, monthFilter, minFieldSpend int, month rules.Month) (int, error) {
 	if maxBudget == 0 {
 		return 0, nil
 	}
@@ -73,6 +86,9 @@ func spendUpToOnSlots(rng *rand.Rand, s *State, slots []hex.Coord, maxBudget int
 		return 0, err
 	}
 	targets := achievableUpTo(planner, maxBudget)
+	if min := effectiveMinFieldSpend(minFieldSpend, maxBudget); min > 0 {
+		targets = filterAtLeast(targets, min)
+	}
 	if len(targets) == 0 {
 		return maxBudget, nil
 	}
@@ -97,16 +113,41 @@ func achievableUpTo(p *costPlanner, max int) []int {
 	return sums
 }
 
-func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget, monthFilter int, month rules.Month) (int, error) {
+func filterAtLeast(values []int, min int) []int {
+	out := make([]int, 0, len(values))
+	for _, v := range values {
+		if v >= min {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget, monthFilter, minFieldSpend int, month rules.Month) (int, error) {
 	if budget <= 0 {
 		return 0, nil
 	}
-	targetSpend := pickFieldSpendTarget(rng, budget, s, player1, month)
+	minFields := effectiveMinFieldSpend(minFieldSpend, budget)
+	targetSpend := pickFieldSpendTarget(rng, budget, s, player1, month, minFields)
 	spent := 0
+	fieldSpent := 0
 	slots := slotsForPlayer(player1)
 	market := field.FilterMarket(marketForPlayer(player1), monthFilter)
-	for spent < targetSpend {
+	for spent < targetSpend || fieldSpent < minFields {
+		if spent >= budget && fieldSpent >= minFields {
+			break
+		}
+		if spent >= targetSpend && fieldSpent < minFields {
+			need := minFields - fieldSpent
+			if spent+need > budget {
+				break
+			}
+			targetSpend = spent + need
+		}
 		actions := affordableShiftActions(s, slots, market, budget, spent, targetSpend, month)
+		if fieldSpent < minFields {
+			actions = filterFieldPurchaseActions(actions)
+		}
 		if len(actions) == 0 {
 			break
 		}
@@ -114,6 +155,9 @@ func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget, monthFilter
 		applyShiftAction(s, act, rng, month)
 		spent += act.cost
 		budget -= act.cost
+		if act.kind != "remove" {
+			fieldSpent += act.cost
+		}
 	}
 	return budget, nil
 }
@@ -132,27 +176,42 @@ func affordableShiftActions(s *State, slots []hex.Coord, market []field.Type, bu
 	return out
 }
 
-func pickFieldSpendTarget(rng *rand.Rand, budget int, s *State, player1 bool, month rules.Month) int {
-	if budget <= 0 || !month.RepairsAllowed() {
-		return rng.Intn(budget + 1)
+func filterFieldPurchaseActions(actions []shiftAction) []shiftAction {
+	out := make([]shiftAction, 0, len(actions))
+	for _, act := range actions {
+		if act.kind != "remove" {
+			out = append(out, act)
+		}
 	}
-	if s.TotalBoardDamage() <= damageRepairThreshold {
-		return rng.Intn(budget + 1)
+	return out
+}
+
+func pickFieldSpendTarget(rng *rand.Rand, budget int, s *State, player1 bool, month rules.Month, minFieldSpend int) int {
+	if budget <= 0 {
+		return 0
 	}
-	damage := s.EmitterDamage
-	if !player1 {
-		damage = s.TotalPlayer2Damage()
+	maxSpend := budget
+	if month.RepairsAllowed() && s.TotalBoardDamage() > damageRepairThreshold {
+		damage := s.EmitterDamage
+		if !player1 {
+			damage = s.TotalPlayer2Damage()
+		}
+		if damage > 0 && rng.Float64() < damageRepairLikelihood {
+			reserve := damage
+			if reserve > budget {
+				reserve = budget
+			}
+			maxSpend = budget - reserve
+		}
 	}
-	if damage <= 0 {
-		return rng.Intn(budget + 1)
+	if minFieldSpend > 0 && minFieldSpend > maxSpend {
+		maxSpend = budget
 	}
-	if rng.Float64() >= damageRepairLikelihood {
-		return rng.Intn(budget + 1)
+	if minFieldSpend > maxSpend {
+		minFieldSpend = maxSpend
 	}
-	reserve := damage
-	if reserve > budget {
-		reserve = budget
+	if maxSpend < minFieldSpend {
+		maxSpend = minFieldSpend
 	}
-	maxSpend := budget - reserve
-	return rng.Intn(maxSpend + 1)
+	return minFieldSpend + rng.Intn(maxSpend-minFieldSpend+1)
 }

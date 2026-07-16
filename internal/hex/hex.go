@@ -57,16 +57,8 @@ func (c Coord) Valid() bool {
 	if c.Q == 0 {
 		return c.R >= 1 && c.R <= 3
 	}
-	// Column 2 (Q=1): out of bounds on the top and bottom extension rows.
-	if c.Q == 1 && (c.R == 0 || c.R == Rows-1) {
-		return false
-	}
 	// Center column (Q=4): out of bounds on the top and bottom extension rows.
 	if c.Q == TurbineCol && (c.R == 0 || c.R == Rows-1) {
-		return false
-	}
-	// Column 6 (Q=5): out of bounds on the top and bottom extension rows.
-	if c.Q == 5 && (c.R == 0 || c.R == Rows-1) {
 		return false
 	}
 	return true
@@ -140,28 +132,16 @@ func (c Coord) Neighbor(dir int) Coord {
 }
 
 // EmitterShotTarget returns the first hex entered when the igniter fires in dir.
-// On the 5-row board the Zünder sits on an even row where NE/SE hex neighbors are
-// out-of-bounds; gameRules still allow shots into the three reactor slots beside it.
+// Shots use ordinary edge neighbors (NE → (0,1), E → (1,2), SE → (0,3)).
 func EmitterShotTarget(dir int) Coord {
-	switch Rotation(DisplayDir(dir % 6)) {
-	case RotNE:
-		return Coord{Q: 1, R: EmitterRow - 1}
-	case RotE:
-		return Coord{Q: 1, R: EmitterRow}
-	case RotSE:
-		return Coord{Q: 1, R: EmitterRow + 1}
-	default:
+	if !ValidShootTravelDir(dir) {
 		return Coord{Q: -1, R: -1}
 	}
+	return Coord{Q: EmitterCol, R: EmitterRow}.Neighbor(dir)
 }
 
-// StepTarget is the next cell for a chip at c moving in dir.
+// StepTarget is the next cell for a chip at c moving in dir along an edge.
 func (c Coord) StepTarget(dir int) Coord {
-	if c.IsEmitter() {
-		if t := EmitterShotTarget(dir); t.Valid() {
-			return t
-		}
-	}
 	return c.Neighbor(dir)
 }
 

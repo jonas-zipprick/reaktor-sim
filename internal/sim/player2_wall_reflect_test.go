@@ -9,9 +9,8 @@ import (
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
 
-func TestVoltageReflectsOffPlayer2WestWall(t *testing.T) {
+func TestVoltageEntersCol6ExtensionFromWest(t *testing.T) {
 	cfg := testCfg()
-	cfg.ShiftDemands = board.ShiftDemands{Industry: 1}
 	cfg.InitialChips = []sim.Chip{{
 		Type: sim.ChipVoltage,
 		Pos:  hex.Coord{Q: 6, R: 0},
@@ -20,25 +19,26 @@ func TestVoltageReflectsOffPlayer2WestWall(t *testing.T) {
 
 	_, snaps := sim.RunTrace(board.NewEmpty(), rand.New(rand.NewSource(3)), cfg)
 	for _, snap := range snaps {
-		if snap.Event == board.BorderDemandEvent(board.ZoneIndustry) {
-			t.Fatal("west wall should reflect, not consume industry demand")
-		}
 		if snap.Event == "Spannungs-Reflektion" {
-			return
+			t.Fatal("west into (5,0) must not reflect")
+		}
+		for _, c := range snap.Queue {
+			if c.Pos == (hex.Coord{Q: 5, R: 0}) {
+				return
+			}
 		}
 	}
-	t.Fatal("expected voltage reflection off player-2 west wall")
+	t.Fatal("expected voltage to enter extension slot (5,0)")
 }
 
-func TestVoltageReflectsOffMarkedDiagonalWalls(t *testing.T) {
+func TestVoltageReflectsOffCol6ExtensionOuterEdges(t *testing.T) {
 	cases := []struct {
 		pos hex.Coord
 		dir hex.Rotation
 	}{
-		{hex.Coord{Q: 4, R: 1}, hex.RotNE},
-		{hex.Coord{Q: 5, R: 1}, hex.RotNW},
-		{hex.Coord{Q: 4, R: 3}, hex.RotSE},
-		{hex.Coord{Q: 5, R: 3}, hex.RotSW},
+		{hex.Coord{Q: 5, R: 0}, hex.RotW},
+		{hex.Coord{Q: 5, R: 0}, hex.RotNE},
+		{hex.Coord{Q: 5, R: 4}, hex.RotSE},
 	}
 	for _, tc := range cases {
 		t.Run(tc.dir.String(), func(t *testing.T) {

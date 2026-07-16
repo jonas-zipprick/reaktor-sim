@@ -267,7 +267,7 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 				rng := rand.New(rand.NewSource(job.seed))
 				budgetP1 := opts.Finance.ReactorBudget + job.parent.leftover.Player1
 				budgetP2 := opts.Finance.GridBudget + job.parent.leftover.Player2
-				endLeft, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter, rules.Month{
+				endLeft, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter, 0, rules.Month{
 					EnergyID:  opts.EnergyCard.ID,
 					FinanceID: opts.Finance.ID,
 				})

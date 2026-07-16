@@ -27,7 +27,7 @@ func TestBuildFlowStartOnlyEmitterEdge(t *testing.T) {
 	if emitter.Edges[0].Heat != 1 {
 		t.Fatalf("emitter edge should be 100%% heat, got %.2f", emitter.Edges[0].Heat)
 	}
-	want := hex.Coord{Q: 1, R: 3}
+	want := hex.Coord{Q: 0, R: 3}
 	if emitter.Edges[0].To != want {
 		t.Fatalf("SE shot should target (%d,%d), got (%d,%d)", want.Q, want.R, emitter.Edges[0].To.Q, emitter.Edges[0].To.R)
 	}

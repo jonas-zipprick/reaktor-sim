@@ -44,7 +44,7 @@ func TestSpendShiftBudgetRotatesBeforeSpending(t *testing.T) {
 	pos := hex.Coord{Q: 2, R: 1}
 	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.Mirror, Orientation: hex.RotE}
 
-	if _, err := SpendShiftBudget(rand.New(rand.NewSource(4)), s, 0, 0, 0, rules.Month{}); err != nil {
+	if _, err := SpendShiftBudget(rand.New(rand.NewSource(4)), s, 0, 0, 0, 0, rules.Month{}); err != nil {
 		t.Fatal(err)
 	}
 	if s.Tiles[pos.Q][pos.R].Orientation == hex.RotE {

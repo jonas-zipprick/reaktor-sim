@@ -5,11 +5,11 @@ Ein asymmetrisches, kooperatives Aufbau- und Kollisionsspiel für 2 Spieler.
 ## **0\. Das Spielfeld im Detail**
 | Column 1 (Player 1 Side) | Column 2 (Player 1 Side) | Column 3 (Player 1 Side) | Column 4 (Player 1 Side) | Column 5 (Player 1 Side) | Column 6 (Player 2 Side) | Column 7 (Player 2 Side) | Column 8 (Player 2 Side) | Column 9 (Player 2 Side) | 
 | :---- | :---: | :---: | :---: | :---: | :---: | :---- | :---: | :---: |
-| out-of-bounds | out-of-bounds | slot | slot | out-of-bounds | out-of-bounds | slot (North walls wired to industrie, West wall reflects) | slot (wired to industrie) | slot (wired to industrie) |
-| slot | slot | slot | slot (with p1 - p2 wall to the right) | slot  (NE wall reflects) | slot (NW wall reflects) | slot | slot | slot (wired to wohnviertel) |
+| out-of-bounds | slot | slot | slot | out-of-bounds | slot (outer edges reflect: NE/NW/W) | slot (North walls wired to industrie) | slot (wired to industrie) | slot (wired to industrie) |
+| slot | slot | slot | slot (feeds warmth to turbine on the right, with p1 - p2 wall to the right) | slot | slot | slot | slot | slot (wired to wohnviertel) |
 | Zünder | slot | slot | slot | Turbine (wired to Reaktorbedarf) | slot | slot | slot | slot (wired to wohnviertel) |
-| slot | slot | slot | slot (with p1 - p2 wall on the right) | slot (SE wall reflects) | slot (SW wall reflects) | slot | slot | slot (wired to Wohnviertel) |
-| out-of-bounds | out-of-bounds | slot | slot | out-of-bounds | out-of-bounds | slot (South walls wired to and Bahn, West Wall reflects) | slot (wired to Bahn) | slot (wired to Bahn) |
+| slot | slot | slot | slot (feeds warmth to turbine on the right, with p1 - p2 wall on the right) | slot | slot | slot | slot | slot (wired to Wohnviertel) |
+| out-of-bounds | slot | slot | slot | out-of-bounds | slot (outer edges reflect: W/SW/SE) | slot (South walls wired to and Bahn) | slot (wired to Bahn) | slot (wired to Bahn) |
 
 ## **1\. Setting & Konzept**
 
@@ -57,7 +57,7 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
   * *Treffer auf reguläres Feld*: Das Feld löst seinen Effekt aus (z.B. wird zerstört oder 1 Wärme wird zu 2 Wärme). Um das Lösen von Energie darzustellen, wird die richtige Anzahl Chips aus dem Bereich “gebunden” des Feldes in den Bereich “ungebunden” gelegt. Der eingehende Chip landet auch im Bereich “ungebunden”.  
   * *Treffer auf ausgebranntes Feld:* Der Chip verschwindet  
   * *Treffer auf Zünder*: Der Chip wird vernichtet. Der Zünder nimmt 1 Schaden.
-  * *Treffer auf Turbine:*   
+  * *Treffer auf Turbine oder anliegende Wände:*   
     * Wärme-Chip: Wird zu einem ungebundenen Spannungs-Chip. Spieler 2 wählt wann und in welche richtung er die Spannungs-Chips abschießt. Sie zählen aber zum 7 Chip Limit und können deshalb nicht endlos aufgestaut werden. Auch die Wand die an der Turbine liegt konvertiert Wärme zu Spannung.
     * Spannungs-Chip: Zählt wie der Kraftwerk-Spielfeldrand. Verschwindet also und entfernt einen Bedarf.  
 * *Kritische Masse:* Existieren zu irgendeinem Zeitpunkt mehr als **7 *gelöste* Chips gleichzeitig** auf der linken Spielhälfte (Spieler 1\) *oder* mehr als 7 *gelöste* Chips auf der rechten Seite habt ihr beide verloren. Im Flug befindliche Chips zählen als gelöst. Alle Chips in Schadenszonen zählen auch zum Limit dazu. 
@@ -75,30 +75,30 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 
 #### **Eröffnungsfeier \- Stufe 1**
 
-**Sonderregel:** Nur schow: Generatoren kostet 1 Chip weniger  
+**Sonderregel:** Die Kritische Chip-Grenze liegt bei 8 stat bei 7
 **Schichtplan:**
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
-| **Schicht 1** | 1 | 0 | 0 | **1** |
+| **Schicht 1** | 1 | 1 | 0 | **1** |
 | **Schicht 2** | 1 | 1 | 0 | **1** |
-| **Schicht 3** | 1 | 1 | 0 | **1** |
-| **Schicht 4** | 2 | 1 | 1 | **1** |
-| **Schicht 5** | 2 | 2 | 1 | **1** |
+| **Schicht 3** | 0 | 1 | 1 | **1** |
+| **Schicht 4** | 1 | 1 | 1 | **1** |
+| **Schicht 5** | 2 | 1 | 1 | **1** |
 
 *Kontext: Ein hochrangiger Parteifunktionär besucht die Anlage; die Sicherheitsprotokolle werden vorübergehend gelockert, um den guten Schein zu wahren.*
 
 #### **Optimierung des lokalen Netzes \- Stufe 1**
 
-**Sonderregel:** Transformatoren kosten 1 Geld statt 3 Geld  
+**Sonderregel:** Transformatoren kosten 2 Geld statt 3 Geld  
 **Schichtplan:**
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
 | :---- | :---: | :---: | :---: | :---: |
-| **Schicht 1** | 0 | 1 | 0 | **1** |
-| **Schicht 2** | 0 | 1 | 0 | **1** |
+| **Schicht 1** | 0 | 1 | 1 | **1** |
+| **Schicht 2** | 0 | 1 | 1 | **1** |
 | **Schicht 3** | 0 | 2 | 0 | **1** |
-| **Schicht 4** | 1 | 2 | 0 | **1** |
+| **Schicht 4** | 1 | 1 | 1 | **1** |
 | **Schicht 5** | 1 | 2 | 1 | **1** |
 
 *Historischer Kontext: Um die Effizienz zu steigern, wurden in den 70ern oft lokale Netzverbesserungen vorgenommen, um die Verluste bei der Fernübertragung zu reduzieren. Diese Maßnahmen waren oft erfolgreich, schufen aber Abhängigkeiten bei der Leitungsführung.*
@@ -175,17 +175,17 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 
 **1\. "Triumph der Schwerindustrie"**
 
-* **Schicht-Budget:** Reaktor: 3 Geld | Stromnetz: 4 Geld.  
-* **Sonderregel:** Uran ist um 1 Geld günstiger.
+* **Schicht-Budget:** Reaktor: 3 Geld | Stromnetz: 3 Geld.  
+* **Sonderregel:** Kohle ist um 1 Geld günstiger.
 
 **2\. "Nationale Sparmaßnahmen"**
 
-* **Schicht-Budget:** Reaktor: 2 Geld | Stromnetz: 2 Geld.  
+* **Schicht-Budget:** Reaktor: 3 Geld | Stromnetz: 2 Geld.  
 * **Sonderregel:** Keine. Ihr müsst mit dem Schrott arbeiten, den ihr habt.
 
 **3\. Nukleares Wettrüsten**
 
-* **Schicht-Budget:** Reaktor: 2 Geld | Stromnetz: 4 Geld.  
+* **Schicht-Budget:** Reaktor: 4 Geld | Stromnetz: 2 Geld.  
 * **Sonderregel:** Reparaturen von Schaden werden nicht bewilligt. Felder (auch ausgebrante) können weiterhin überbaut werden
 * *Historischer Kontext: In der Anlage Majak fiel 1957 das Kühlsystem für nukleare Abfälle aus. Da das Finanzbüro keine Reparaturmittel bewilligte (um die Produktion nicht zu stören), überhitzte ein Tank und löste den drittschwersten Nuklearunfall der Geschichte aus (Kyshtym-Vorfall).*
 
@@ -196,7 +196,7 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
 
 * **Ablenk-Spiegel (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Teilchen im fixen Winkel ab.  
-* **Kohle-Brennkammer (Kosten: 2 Geld | Ladung: 4 Chips):** 1 Wärme trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Wärme zufällig ab. Im ausgebrannten Zustand leitet Kohle Wärme in eine zufällige Richtung weiter.  
+* **Kohle-Brennkammer (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Wärme trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Wärme zufällig ab. Im ausgebrannten Zustand leitet Kohle Wärme in eine zufällige Richtung weiter.  
 * **Kühlturm (Kosten: 2 Geld | Ladung: Keine):** Vernichtet von der einen Seite eintreffende Wärme restlos während es die Wärme von der anderen Seite ungehindert durchfliegen lässt.  
 
 * **Erdgas-Kessel (Kosten: 3 Geld | Ladung: 8 Chips | ab 2\. Monat):** 1 Wärme trifft ein \-\> verbraucht 3 Ladung \-\> feuert 4 Wärme ab. Vernichtet einkommende Chips im ausgebrannten Zustand.
@@ -214,8 +214,8 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 
 * **Relais / Weiche (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Spannung im fixen Winkel ab.
 * **Erdung / Widerstand (Kosten: 1 Geld):** Leitet von der einen Seite eintreffende Spannung ab (vernichtet sie) während es die Spannung von der anderen Seite ungehindert durchfliegen lässt. Wichtig bei Überproduktion\!  
+* **Notgenerator (Kosten: 2 Geld | Ladung: 1 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht nach rechts (Osten). Ist er ausgebrant, so leitet er einkommende Spannungschips in zufällige Richtungen weiter. Ist er noch geladen, so vernichtet er einkommende Spannung ohne sich aufzuladen.
 * **Transformator (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
-* **Notgenerator (Kosten: 3 Geld | Ladung: 2 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht, eine Ladung in eine gewünschte Richtung. Leitet einkommende Spannungschips in zufällige Richtungen weiter. Ist er noch geladen, so vernichtet er einkommende Spannung ohne sich aufzuladen.
 
 * **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 4 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum **Limit von 7 Chips** für die linke Spielhälfte.
 * **Blei-Akkumulator (Kosten: 3 Geld | Ladung: Maximal 2 Chip | ab 2\. Monat):** Wie Kondensator-Bank, aber verliert zu Begin der Schicht 1 Chip anstatt geleert zu werden. Bewege einen Chip auf ungebunden. Dieser Chip fliegt unkontrolliert in eine zufällige Richtung. Statt zu explodieren, werden einkommende Ladungschips in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  

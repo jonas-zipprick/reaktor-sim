@@ -7,6 +7,19 @@ import (
 	"github.com/jonas/reaktor-sim/internal/hex"
 )
 
+func TestEmergencyGeneratorCostAndRotation(t *testing.T) {
+	info := field.Catalog[field.EmergencyGenerator]
+	if info.Cost != 2 {
+		t.Fatalf("cost = %d, want 2", info.Cost)
+	}
+	if info.InitialCharge != 1 || info.MaxCharge != 1 {
+		t.Fatalf("charge = %d/%d, want 1/1", info.InitialCharge, info.MaxCharge)
+	}
+	if !field.HasRotation(field.EmergencyGenerator) {
+		t.Fatal("notgenerator orientation should affect simulation")
+	}
+}
+
 func TestAllowedOnCellReactorFuelNotOnTurbineColumn(t *testing.T) {
 	wallSlot := hex.Coord{Q: hex.TurbineCol, R: 3}
 	if field.AllowedOnCell(field.CoalChamber, wallSlot) {

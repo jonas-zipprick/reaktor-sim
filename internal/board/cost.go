@@ -5,6 +5,7 @@ import (
 
 	"github.com/jonas/reaktor-sim/internal/field"
 	"github.com/jonas/reaktor-sim/internal/hex"
+	"github.com/jonas/reaktor-sim/internal/rules"
 )
 
 // PlayerCosts holds placement costs per player half.
@@ -23,8 +24,14 @@ func (c PlayerCosts) String() string {
 	return fmt.Sprintf("Reaktor: %d Geld | Stromnetz: %d Geld", c.Player1, c.Player2)
 }
 
-// PlayerCosts sums placement costs per player half.
+// PlayerCosts sums placement costs per player half using base catalog prices.
 func (s *State) PlayerCosts() PlayerCosts {
+	return s.PlayerCostsFor(rules.Month{})
+}
+
+// PlayerCostsFor sums placement costs under the given month's field pricing
+// (finance/energy discounts).
+func (s *State) PlayerCostsFor(month rules.Month) PlayerCosts {
 	var costs PlayerCosts
 	for _, c := range hex.AllBoardCoords {
 		if c.Kind() != hex.CellSlot {
@@ -34,7 +41,7 @@ func (s *State) PlayerCosts() PlayerCosts {
 		if t == nil || t.Type == field.Empty {
 			continue
 		}
-		n := t.Cost()
+		n := month.FieldCost(t.Type)
 		if c.IsPlayer2() {
 			costs.Player2 += n
 		} else {

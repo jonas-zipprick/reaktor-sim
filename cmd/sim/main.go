@@ -106,9 +106,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("prev-board: %v", err)
 		}
-		leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, monthRules)
+		leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, board.MinFirstShiftFieldSpend, monthRules)
 	case *costP1 > 0 || *costP2 > 0:
-		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter, monthRules)
+		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter, board.MinFirstShiftFieldSpend, monthRules)
 	default:
 		state = board.Random(rng, *monthFilter)
 	}
@@ -125,7 +125,7 @@ func main() {
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = energy.Card{}
 	cfg.FinanceCard = financeCard
-	cfg.CriticalLimit = financeCard.CriticalLimit()
+	cfg.CriticalLimit = monthRules.CriticalLimit()
 	cfg.Shift = 1
 	cfg.RandomShift = false
 	cfg.ShiftDemands = shiftDemands
@@ -137,7 +137,7 @@ func main() {
 	fmt.Printf("Reaktor-Sim: %d Durchläufe (Seed %d)\n", *runs, *seed)
 	boardFP := board.Fingerprint(state)
 	fmt.Printf("Board-Fingerprint: %s\n", boardFP)
-	boardCosts := state.PlayerCosts()
+	boardCosts := state.PlayerCostsFor(monthRules)
 	fmt.Printf("Board-Kosten: %s (gesamt %d Geld)\n", boardCosts.String(), boardCosts.Total())
 	if *monthFilter > 0 {
 		fmt.Printf("Monats-Filter: %d (nur ab diesem Monat verfuegbare Felder)\n", *monthFilter)
@@ -165,7 +165,7 @@ func main() {
 	printDemands(preview)
 
 	traceIndex := make([]render.TraceIndexEntry, 0)
-	traceCosts := state.PlayerCosts()
+	traceCosts := state.PlayerCostsFor(monthRules)
 
 	if *traceFirst >= 0 {
 		n := *traceFirst
@@ -273,7 +273,7 @@ func main() {
 			log.Printf("Warnung: trace_index.yaml: %v", err)
 		}
 	}
-	report := stats.Build(state.PlayerCosts(), leftover, results)
+	report := stats.Build(state.PlayerCostsFor(monthRules), leftover, results)
 
 	printSummary(report)
 

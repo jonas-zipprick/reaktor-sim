@@ -13,7 +13,7 @@ import (
 func TestSpendShiftBudgetNoCoalOnTurbineColumn(t *testing.T) {
 	for seed := int64(1); seed <= 500; seed++ {
 		state := board.NewEmpty()
-		_, err := board.SpendShiftBudget(rand.New(rand.NewSource(seed)), state, 20, 0, 0, rules.Month{})
+		_, err := board.SpendShiftBudget(rand.New(rand.NewSource(seed)), state, 20, 0, 0, 0, rules.Month{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -30,7 +30,7 @@ func TestSpendShiftBudgetNoCoalOnTurbineColumn(t *testing.T) {
 
 func TestRandomWithPlayerCostsRespectsSector(t *testing.T) {
 	for seed := int64(1); seed <= 200; seed++ {
-		s, _, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(seed)), 20, 20, 0, rules.Month{})
+		s, _, err := board.RandomWithPlayerCosts(rand.New(rand.NewSource(seed)), 20, 20, 0, 0, rules.Month{})
 		if err != nil {
 			t.Fatal(err)
 		}

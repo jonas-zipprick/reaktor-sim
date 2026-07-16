@@ -11,6 +11,7 @@ import (
 	"github.com/jonas/reaktor-sim/internal/energy"
 	"github.com/jonas/reaktor-sim/internal/finance"
 	"github.com/jonas/reaktor-sim/internal/render"
+	"github.com/jonas/reaktor-sim/internal/rules"
 	"github.com/jonas/reaktor-sim/internal/seedsearch"
 	"github.com/jonas/reaktor-sim/internal/sim"
 	"github.com/jonas/reaktor-sim/internal/stats"
@@ -107,7 +108,7 @@ func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearc
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = card
 	cfg.FinanceCard = fin
-	cfg.CriticalLimit = fin.CriticalLimit()
+	cfg.CriticalLimit = card.CriticalLimit()
 	cfg.Shift = o.Shift
 	cfg.RandomShift = false
 	cfg.ShiftDemands = o.StartDemands
@@ -119,7 +120,8 @@ func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearc
 	preview.ApplyDemands(cfg.ShiftDemands)
 	previewChips := sim.EmitterChips(preview, cfg, rng)
 
-	traceCosts := state.PlayerCosts()
+	month := rules.Month{EnergyID: card.ID, FinanceID: fin.ID}
+	traceCosts := state.PlayerCostsFor(month)
 	traceMeta := render.TraceMeta{
 		Shift: o.Shift,
 		Costs: traceCosts,
@@ -203,7 +205,7 @@ func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearc
 
 	if export.topSimCharts {
 		results := sim.RunMonteCarlo(state, runs, o.Seed, cfg)
-		report := stats.Build(state.PlayerCosts(), o.EndLeftover, results)
+		report := stats.Build(state.PlayerCostsFor(month), o.EndLeftover, results)
 		if len(chainPrefix) > 1 {
 			cm := seedsearch.CampaignMoneyFromChain(chainPrefix, fin)
 			report.Campaign = &cm

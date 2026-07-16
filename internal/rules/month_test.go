@@ -13,8 +13,8 @@ func TestFieldCostDiscounts(t *testing.T) {
 	}
 
 	netz := rules.Month{EnergyID: "netzoptimierung"}
-	if got := netz.FieldCost(field.Transformer); got != 1 {
-		t.Fatalf("transformer = %d, want 1", got)
+	if got := netz.FieldCost(field.Transformer); got != 2 {
+		t.Fatalf("transformer = %d, want 2", got)
 	}
 
 	tech := rules.Month{EnergyID: "technologische-transformation"}
@@ -23,22 +23,15 @@ func TestFieldCostDiscounts(t *testing.T) {
 	}
 
 	ind := rules.Month{FinanceID: "schwerindustrie"}
-	if got := ind.FieldCost(field.UraniumPlate); got != 4 {
-		t.Fatalf("uran schwerindustrie = %d, want 4", got)
+	if got := ind.FieldCost(field.CoalChamber); got != 1 {
+		t.Fatalf("coal schwerindustrie = %d, want 1", got)
 	}
-
-	stacked := rules.Month{EnergyID: "technologische-transformation", FinanceID: "schwerindustrie"}
-	if got := stacked.FieldCost(field.UraniumPlate); got != 3 {
-		t.Fatalf("uran stacked = %d, want 3", got)
+	if got := ind.FieldCost(field.UraniumPlate); got != 5 {
+		t.Fatalf("uran schwerindustrie = %d, want 5 (no discount)", got)
 	}
 }
 
 func TestInitialChargeModifiers(t *testing.T) {
-	eroeff := rules.Month{EnergyID: "eroeffnungsfeier"}
-	if got := eroeff.InitialCharge(field.EmergencyGenerator); got != 2 {
-		t.Fatalf("generator = %d, want 2", got)
-	}
-
 	gossnab := rules.Month{EnergyID: "gossnab"}
 	if got := gossnab.InitialCharge(field.CoalChamber); got != 3 {
 		t.Fatalf("coal = %d, want 3", got)
@@ -48,8 +41,15 @@ func TestInitialChargeModifiers(t *testing.T) {
 	}
 }
 
+func TestCriticalLimitEroeffnungsfeier(t *testing.T) {
+	m := rules.Month{EnergyID: "eroeffnungsfeier"}
+	if got := m.CriticalLimit(); got != 8 {
+		t.Fatalf("limit = %d, want 8", got)
+	}
+}
+
 func TestCriticalLimitUmJedenPreis(t *testing.T) {
-	m := rules.Month{FinanceID: "um-jeden-preis"}
+	m := rules.Month{EnergyID: "um-jeden-preis"}
 	if got := m.CriticalLimit(); got != 10 {
 		t.Fatalf("limit = %d, want 10", got)
 	}

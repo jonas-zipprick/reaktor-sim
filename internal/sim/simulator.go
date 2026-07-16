@@ -67,7 +67,8 @@ type Snapshot struct {
 type Config struct {
 	MaxSteps      int
 	CriticalLimit int
-	StartDir      int // 0-5 emitter shoot override per run, or -1 = random once per run
+	StartDir         int // 0-5 emitter shoot override per run, or -1 = random once per run
+	TurbineStartDir  int // 0-5 turbine voltage override, or -1 = random NE/E/SE per converted chip
 	ShiftDemands  board.ShiftDemands
 	EnergyCard    energy.Card // when set, overrides ShiftDemands per run
 	FinanceCard   finance.Card
@@ -84,12 +85,14 @@ func DefaultConfig() Config {
 	card := energy.DefaultCard()
 	fin := finance.DefaultCard()
 	return Config{
-		MaxSteps:      MaxStepsPerRun,
-		CriticalLimit: fin.CriticalLimit(),
-		EnergyCard:    card,
-		FinanceCard:   fin,
-		Shift:         1,
-		ShiftDemands:  card.ShiftDemands(1),
+		MaxSteps:        MaxStepsPerRun,
+		CriticalLimit:   card.CriticalLimit(),
+		StartDir:        -1, // random NE/E/SE once per run
+		TurbineStartDir: -1, // random NE/E/SE per converted heat chip
+		EnergyCard:      card,
+		FinanceCard:     fin,
+		Shift:           1,
+		ShiftDemands:    card.ShiftDemands(1),
 	}
 }
 
@@ -101,7 +104,7 @@ type engine struct {
 	rng             *rand.Rand
 	cfg             Config
 	emitterShootDir int // fixed for entire run (Zünder)
-	turbineShootDir int // fixed for entire run (Turbine voltage)
+	turbineShootDir int // >=0 fixed for run; <0 = sample NE/E/SE per converted chip
 	trace           []Snapshot
 	step         int
 	lastResolved Chip
@@ -393,6 +396,17 @@ func (e *engine) resolve(chip Chip) {
 		}
 	}
 
+	if chip.Type == ChipVoltage && hex.VoltageReflectsAtOuterWall(chip.Pos, chip.Dir) {
+		reflected := Chip{
+			Type: ChipVoltage,
+			Pos:  chip.Pos,
+			Dir:  hex.ReflectOffOuterWall(chip.Dir),
+		}
+		e.queue = append(e.queue, reflected)
+		e.recordStep("Spannungs-Reflektion", &reflected)
+		return
+	}
+
 	nextPos := chip.Pos.StepTarget(chip.Dir)
 
 	if nextPos.IsEmitter() {
@@ -629,8 +643,21 @@ func shootDir(cfg Config, rng *rand.Rand) int {
 	return hex.RandomShootDir(rng)
 }
 
+func turbineShootDir(cfg Config, rng *rand.Rand) int {
+	if cfg.TurbineStartDir >= 0 {
+		return cfg.TurbineStartDir % 6
+	}
+	return hex.RandomShootDir(rng)
+}
+
 func pickRunShootDirs(cfg Config, rng *rand.Rand) (emitter, turbine int) {
-	return shootDir(cfg, rng), hex.RandomShootDir(rng)
+	// TurbineStartDir < 0: direction is sampled per converted chip in processTurbine.
+	// When fixed (>= 0), store it once so every voltage shares that override.
+	turbine = cfg.TurbineStartDir
+	if turbine >= 0 {
+		turbine %= 6
+	}
+	return shootDir(cfg, rng), turbine
 }
 
 // EmitterChips returns the chip fired from the igniter at shift start when demand
@@ -705,14 +732,19 @@ func (e *engine) maybeVoluntaryFire() bool {
 		if tile.Charge <= 0 {
 			tile.BurnedOut = true
 		}
+		e.queue = append(e.queue, Chip{
+			Type: ChipVoltage,
+			Pos:  src.pos,
+			Dir:  tile.Orientation.TravelDir(),
+		})
 	default:
 		tile.StoredVoltage--
+		e.queue = append(e.queue, Chip{
+			Type: ChipVoltage,
+			Pos:  src.pos,
+			Dir:  hex.RandomTravelDir(e.rng),
+		})
 	}
-	e.queue = append(e.queue, Chip{
-		Type: ChipVoltage,
-		Pos:  src.pos,
-		Dir:  hex.RandomTravelDir(e.rng),
-	})
 	e.lastResolved = e.queue[len(e.queue)-1]
 	e.hasResolved = true
 	e.recordStep("Freiwilliger Schuss", nil)
@@ -797,10 +829,14 @@ func (e *engine) processTurbine(chip Chip) (event string, active *Chip) {
 	switch chip.Type {
 	case ChipHeat:
 		e.res.HeatAtTurbine++
+		dir := e.turbineShootDir
+		if dir < 0 {
+			dir = turbineShootDir(e.cfg, e.rng)
+		}
 		e.queue = append(e.queue, Chip{
 			Type: ChipVoltage,
 			Pos:  tCoord,
-			Dir:  e.turbineShootDir,
+			Dir:  dir,
 		})
 		return "Turbine", &chip
 	case ChipVoltage:

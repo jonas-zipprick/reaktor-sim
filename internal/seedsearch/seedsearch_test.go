@@ -43,7 +43,7 @@ func TestEvaluateChainDeterministic(t *testing.T) {
 }
 
 func TestEvaluateChainInitialBoardCosts(t *testing.T) {
-	fin, ok := finance.ByID("schwerindustrie") // Reaktor 3 | Stromnetz 4
+	fin, ok := finance.ByID("schwerindustrie") // Reaktor 3 | Stromnetz 3
 	if !ok {
 		t.Fatal("finance card missing")
 	}
@@ -56,8 +56,8 @@ func TestEvaluateChainInitialBoardCosts(t *testing.T) {
 	}
 	spent := chain[0].BoardCosts
 	left := chain[0].EndLeftover
-	if spent.Player1+left.Player1 != 3 || spent.Player2+left.Player2 != 4 {
-		t.Fatalf("shift-1 spend %+v + rest %+v != budget 3/4", spent, left)
+	if spent.Player1+left.Player1 != 3 || spent.Player2+left.Player2 != 3 {
+		t.Fatalf("shift-1 spend %+v + rest %+v != budget 3/3", spent, left)
 	}
 }
 
