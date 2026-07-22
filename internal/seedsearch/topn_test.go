@@ -4,11 +4,11 @@ import "testing"
 
 func TestTopNMatchesFullSort(t *testing.T) {
 	outcomes := []Outcome{
-		{Seed: 1, Wins: 3},
-		{Seed: 2, Wins: 9},
-		{Seed: 3, Wins: 5},
-		{Seed: 4, Wins: 9},
-		{Seed: 5, Wins: 1},
+		{Seed: 1, Wins: 3, Runs: 10},
+		{Seed: 2, Wins: 9, Runs: 10},
+		{Seed: 3, Wins: 5, Runs: 10},
+		{Seed: 4, Wins: 9, Runs: 10},
+		{Seed: 5, Wins: 1, Runs: 10},
 	}
 	got := TopWins(outcomes, 3)
 	if len(got) != 3 {

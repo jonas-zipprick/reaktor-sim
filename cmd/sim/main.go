@@ -106,7 +106,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("prev-board: %v", err)
 		}
-		leftover, err = board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, board.MinFirstShiftFieldSpend, monthRules)
+		spendRes, spendErr := board.SpendShiftBudget(rng, state, *costP1, *costP2, *monthFilter, board.MinFirstShiftFieldSpend, monthRules)
+		leftover = spendRes.Leftover
+		err = spendErr
 	case *costP1 > 0 || *costP2 > 0:
 		state, leftover, err = board.RandomWithPlayerCosts(rng, *costP1, *costP2, *monthFilter, board.MinFirstShiftFieldSpend, monthRules)
 	default:
@@ -376,10 +378,18 @@ func repairBudgetsForRun(state *board.State, fin finance.Card, flagGridBudget, l
 	}
 	grid = flagGridBudget
 	if grid < 0 {
-		grid = board.GridRepairBudget(leftoverP2, state)
+		total := state.TotalPlayer2Damage()
+		if leftoverP2 > total {
+			grid = total
+		} else {
+			grid = leftoverP2
+		}
 	} else if total := state.TotalPlayer2Damage(); grid > total {
 		grid = total
 	}
-	reactor = board.ReactorRepairBudget(leftoverP1, state)
+	reactor = leftoverP1
+	if reactor > state.EmitterDamage {
+		reactor = state.EmitterDamage
+	}
 	return reactor, grid
 }

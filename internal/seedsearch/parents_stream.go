@@ -43,14 +43,7 @@ func newParentSelector(keep int) *parentSelector {
 	sel := &parentSelector{
 		keep:       keep,
 		candidateN: keep * 4,
-		loopHeap: &topHeap{
-			less: func(a, b Outcome) bool {
-				if a.Loops != b.Loops {
-					return a.Loops > b.Loops
-				}
-				return a.Seed < b.Seed
-			},
-		},
+		loopHeap:   &topHeap{less: lessLoops},
 		tableHeaps: make([]*topHeap, len(tableLessFns)),
 	}
 	for i, less := range tableLessFns {
@@ -60,30 +53,10 @@ func newParentSelector(keep int) *parentSelector {
 }
 
 var tableLessFns = []func(a, b Outcome) bool{
-	func(a, b Outcome) bool {
-		if a.Wins != b.Wins {
-			return a.Wins > b.Wins
-		}
-		return a.Seed < b.Seed
-	},
-	func(a, b Outcome) bool {
-		if a.AllDemandsNoDamage != b.AllDemandsNoDamage {
-			return a.AllDemandsNoDamage > b.AllDemandsNoDamage
-		}
-		return a.Seed < b.Seed
-	},
-	func(a, b Outcome) bool {
-		if a.Max1DemandNoDamage != b.Max1DemandNoDamage {
-			return a.Max1DemandNoDamage > b.Max1DemandNoDamage
-		}
-		return a.Seed < b.Seed
-	},
-	func(a, b Outcome) bool {
-		if a.Max1DemandMax1Damage != b.Max1DemandMax1Damage {
-			return a.Max1DemandMax1Damage > b.Max1DemandMax1Damage
-		}
-		return a.Seed < b.Seed
-	},
+	lessWins,
+	lessAllDemandsNoDamage,
+	lessMax1DemandNoDamage,
+	lessMax1DemandMax1Damage,
 }
 
 func (s *parentSelector) consider(o Outcome) {

@@ -9,27 +9,29 @@ import (
 // Card is one finance card granting a per-shift budget for the whole month.
 // The same budget is available at the start of every shift.
 type Card struct {
-	ID            string
-	Name          string
-	ReactorBudget int // Spieler 1 (Reaktor) money per shift
-	GridBudget    int // Spieler 2 (Stromnetz) money per shift
-	SpecialRule   string
+	ID                 string
+	Name               string
+	ReactorBudget      int // Spieler 1 (Reaktor) money per shift
+	GridBudget         int // Spieler 2 (Stromnetz) money per shift
+	SpecialRule        string
+	AvailableFromMonth int // earliest campaign month (1 = from start; 0 = from start)
 }
 
 // Cards is the standard finance deck from gameRules.md.
 var Cards = []Card{
 	{
 		ID: "schwerindustrie", Name: "Triumph der Schwerindustrie",
-		ReactorBudget: 3, GridBudget: 3,
+		ReactorBudget: 4, GridBudget: 4,
 		SpecialRule: "Kohle ist um 1 Geld guenstiger",
 	},
 	{
 		ID: "sparmassnahmen", Name: "Nationale Sparmaßnahmen",
-		ReactorBudget: 3, GridBudget: 2,
+		ReactorBudget: 3, GridBudget: 3,
+		AvailableFromMonth: 2,
 	},
 	{
 		ID: "wettruesten", Name: "Nukleares Wettrüsten",
-		ReactorBudget: 4, GridBudget: 2,
+		ReactorBudget: 5, GridBudget: 3,
 		SpecialRule: "Reparaturen nicht bewilligt; ausgebrannte Felder duerfen ueberbaut werden",
 	},
 }
@@ -53,6 +55,19 @@ func ByID(id string) (Card, bool) {
 // RepairsAllowed reports whether leftover money may be spent on damage repair.
 func (c Card) RepairsAllowed() bool {
 	return c.ID != "wettruesten"
+}
+
+// AvailableInMonth reports whether this finance card may appear in campaign month m.
+// monthFilter 0 means no filter (all cards allowed).
+func (c Card) AvailableInMonth(monthFilter int) bool {
+	if monthFilter <= 0 {
+		return true
+	}
+	from := c.AvailableFromMonth
+	if from <= 0 {
+		from = 1
+	}
+	return monthFilter >= from
 }
 
 // Describe formats card name and per-shift budget for logging.

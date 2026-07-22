@@ -71,18 +71,6 @@ func (s *State) AddEmitterDamage() {
 	s.EmitterDamage++
 }
 
-// ReactorRepairBudget returns how much leftover reactor money can be spent on
-// igniter repairs (1 money per damage chip).
-func ReactorRepairBudget(leftoverP1 int, s *State) int {
-	if leftoverP1 <= 0 {
-		return 0
-	}
-	if leftoverP1 > s.EmitterDamage {
-		return s.EmitterDamage
-	}
-	return leftoverP1
-}
-
 // RepairEmitterDamage removes igniter damage at 1 money per chip until budget
 // or damage runs out. Returns money spent.
 func (s *State) RepairEmitterDamage(budget int) int {
@@ -94,19 +82,6 @@ func (s *State) RepairEmitterDamage(budget int) int {
 	}
 	s.EmitterDamage -= budget
 	return budget
-}
-
-// GridRepairBudget returns how much leftover grid money can be spent on repairs
-// (1 money per damage chip) until money or damage runs out.
-func GridRepairBudget(leftoverP2 int, s *State) int {
-	if leftoverP2 <= 0 {
-		return 0
-	}
-	total := s.TotalPlayer2Damage()
-	if leftoverP2 > total {
-		return total
-	}
-	return leftoverP2
 }
 
 // RepairRandomDamage removes damage chips at 1 money each, choosing zones
@@ -128,6 +103,65 @@ func (s *State) RepairRandomDamage(rng *rand.Rand, budget int) int {
 		spent += repairCostPerChip
 	}
 	return spent
+}
+
+const damageHighThreshold = 3
+
+// repairChance returns the probability that a player half decides to repair,
+// depending on the number of damage chips on that half.
+func repairChance(damage int, high bool) float64 {
+	if damage <= 0 {
+		return 0
+	}
+	if damage > damageHighThreshold {
+		if high {
+			return 0.80
+		}
+		return 0.50
+	}
+	if high {
+		return 0.40
+	}
+	return 0.20
+}
+
+// HalfDamage returns the damage count relevant for one player half.
+func (s *State) HalfDamage(player1 bool) int {
+	if player1 {
+		return s.EmitterDamage
+	}
+	return s.TotalPlayer2Damage()
+}
+
+// RepairHalf repairs damage on one player half, spending a random amount
+// (1 to damage, capped by budget) at 1 money per chip.
+// Returns money spent.
+func (s *State) RepairHalf(rng *rand.Rand, player1 bool, budget int) int {
+	damage := s.HalfDamage(player1)
+	if budget <= 0 || damage <= 0 {
+		return 0
+	}
+	maxRepair := damage
+	if maxRepair > budget {
+		maxRepair = budget
+	}
+	amount := 1 + rng.Intn(maxRepair)
+	if player1 {
+		return s.RepairEmitterDamage(amount)
+	}
+	return s.RepairRandomDamage(rng, amount)
+}
+
+// MaybeRepair rolls against the repair chance for one player half.
+// If the roll succeeds, it repairs a random amount and returns the money spent.
+// preFieldPurchase distinguishes between the pre- and post-purchase repair phases.
+func (s *State) MaybeRepair(rng *rand.Rand, player1 bool, budget int, preFieldPurchase bool) int {
+	damage := s.HalfDamage(player1)
+	chance := repairChance(damage, !preFieldPurchase)
+	if chance <= 0 || rng.Float64() >= chance {
+		return 0
+	}
+	return s.RepairHalf(rng, player1, budget)
 }
 
 func zonesWithDamage(s *State) []Zone {

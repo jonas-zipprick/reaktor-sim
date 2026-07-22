@@ -50,8 +50,8 @@ func TestCampaignMoneyBalancesMonthBudget(t *testing.T) {
 		repair  int
 		saved   int
 	}{
-		{"P1", cm.MonthBudget[0], last.BoardCosts.Player1, int(cm.RebuildF[0] + 0.5), int(last.AvgReactorRepairSpent + 0.5), int(last.AvgSavedP1 + 0.5)},
-		{"P2", cm.MonthBudget[1], last.BoardCosts.Player2, int(cm.RebuildF[1] + 0.5), int(last.AvgRepairSpent + 0.5), int(last.AvgSavedP2 + 0.5)},
+		{"P1", cm.MonthBudget[0], last.BoardCosts.Player1, int(cm.RebuildF[0] + 0.5), int(cm.AvgRepairF[0] + 0.5), int(last.AvgSavedP1 + 0.5)},
+		{"P2", cm.MonthBudget[1], last.BoardCosts.Player2, int(cm.RebuildF[1] + 0.5), int(cm.AvgRepairF[1] + 0.5), int(last.AvgSavedP2 + 0.5)},
 	}
 	for _, tc := range cases {
 		accounted := tc.board + tc.rebuild + tc.repair + tc.saved

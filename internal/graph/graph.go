@@ -106,7 +106,7 @@ func normalizeNodeEdges(g *Graph) {
 func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOut {
 	if tile.BurnedOut {
 		switch tile.Type {
-		case field.CoalChamber:
+		case field.GasBoiler:
 			return emitterOut(c, 1, 1, 0, true)
 		case field.Transformer:
 			return burnedRedirectOut(c)
@@ -134,9 +134,38 @@ func outgoingTransitions(c hex.Coord, tile *field.Tile, incomingDir int) []rawOu
 			return []rawOut{{to: next, voltage: 1}}
 		}
 	case field.CoalChamber:
-		return emitterOut(c, 2, 1, 0, tile.Charge > 0)
+		if tile.Charge <= 0 {
+			return nil
+		}
+		if tile.UnboundHeat > 0 {
+			return emitterOut(c, 4, 1, 0, true)
+		}
+		return absorb()
+	case field.PressureValve:
+		if tile.Charge >= 1 {
+			outDir := tile.Orientation.TravelDir()
+			next := c.Neighbor(outDir)
+			if hex.CanEnter(c, next) {
+				return []rawOut{{to: next, heat: 2}}
+			}
+			return nil
+		}
+		return absorb()
+	case field.DistributionStation:
+		if tile.Charge < 1 {
+			return absorbVoltage()
+		}
+		var outs []rawOut
+		for _, edge := range []int{0, 3} {
+			outDir := hex.Rotation((int(tile.Orientation) + edge) % 6).TravelDir()
+			next := c.Neighbor(outDir)
+			if hex.CanEnter(c, next) {
+				outs = append(outs, rawOut{to: next, voltage: 1})
+			}
+		}
+		return outs
 	case field.GasBoiler:
-		return emitterOut(c, 4, 1, 0, tile.Charge > 0)
+		return emitterOut(c, 2, 1, 0, tile.Charge > 0)
 	case field.CoolingTower:
 		if tile.Orientation.ParallelToAxis(incomingDir) {
 			outDir := hex.PassThroughDir(incomingDir)

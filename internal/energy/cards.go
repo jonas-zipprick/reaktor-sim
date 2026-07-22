@@ -32,7 +32,7 @@ var Cards = []Card{
 	},
 	{
 		ID: "netzoptimierung", Name: "Optimierung des lokalen Netzes", Level: 1,
-		SpecialRule: "Transformatoren kosten 2 Geld statt 3 Geld",
+		SpecialRule: "Verteilerstationen kosten 1 Geld statt 2 Geld",
 		Shifts: [5]board.ShiftDemands{
 			{Industry: 0, Residential: 1, Rail: 1, Plant: 1},
 			{Industry: 0, Residential: 1, Rail: 1, Plant: 1},

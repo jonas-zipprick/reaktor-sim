@@ -12,7 +12,7 @@ import (
 func TestValidShiftActionsAllowsOverbuildOnOccupiedSlot(t *testing.T) {
 	pos := hex.Coord{Q: 1, R: 1}
 	s := NewEmpty()
-	s.Tiles[pos.Q][pos.R] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 
 	slots := slotsForPlayer(true)
 	market := marketFor(pos, 0)
@@ -20,13 +20,13 @@ func TestValidShiftActionsAllowsOverbuildOnOccupiedSlot(t *testing.T) {
 
 	var found bool
 	for _, a := range actions {
-		if a.coord == pos && a.kind == "overbuild" && a.tile == field.GasBoiler {
+		if a.coord == pos && a.kind == "overbuild" && a.tile == field.Mirror {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected overbuild action on occupied coal, got %+v", actions)
+		t.Fatalf("expected overbuild action on occupied gas, got %+v", actions)
 	}
 }
 
@@ -46,42 +46,42 @@ func TestValidShiftActionsSkipsSameTypeOverbuildOnLiveField(t *testing.T) {
 func TestValidShiftActionsAllowsBuildOnBurnedOutSlot(t *testing.T) {
 	pos := hex.Coord{Q: 1, R: 1}
 	s := NewEmpty()
-	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.CoalChamber, BurnedOut: true}
+	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.GasBoiler, BurnedOut: true}
 
 	slots := slotsForPlayer(true)
 	market := marketFor(pos, 0)
-	actions := validShiftActions(s, slots, market, 2, rules.Month{})
+	actions := validShiftActions(s, slots, market, 3, rules.Month{})
 
 	var found bool
 	for _, a := range actions {
-		if a.coord == pos && a.tile == field.CoalChamber && a.cost == 2 {
+		if a.coord == pos && a.tile == field.GasBoiler && a.cost == 3 {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Fatalf("expected place action on burned coal slot, got %+v", actions)
+		t.Fatalf("expected place action on burned gas slot, got %+v", actions)
 	}
 }
 
 func TestApplyShiftActionOverbuildRefreshesTile(t *testing.T) {
 	pos := hex.Coord{Q: 1, R: 1}
 	s := NewEmpty()
-	s.Tiles[pos.Q][pos.R] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
 	s.Tiles[pos.Q][pos.R].Charge = 1
 
 	applyShiftAction(s, shiftAction{
 		kind:  "overbuild",
 		coord: pos,
-		tile:  field.GasBoiler,
+		tile:  field.CoalChamber,
 		cost:  3,
 	}, nil, rules.Month{})
 
 	tile := s.Tiles[pos.Q][pos.R]
-	if tile.Type != field.GasBoiler {
-		t.Fatalf("tile type = %v, want gas boiler", tile.Type)
+	if tile.Type != field.CoalChamber {
+		t.Fatalf("tile type = %v, want coal chamber", tile.Type)
 	}
-	if tile.Charge != field.Catalog[field.GasBoiler].InitialCharge {
+	if tile.Charge != field.Catalog[field.CoalChamber].InitialCharge {
 		t.Fatalf("charge = %d, want full initial charge", tile.Charge)
 	}
 }
@@ -89,9 +89,9 @@ func TestApplyShiftActionOverbuildRefreshesTile(t *testing.T) {
 func TestPickShiftActionPrefersBurnedSameTypeRefresh(t *testing.T) {
 	pos := hex.Coord{Q: 1, R: 1}
 	s := NewEmpty()
-	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.CoalChamber, BurnedOut: true}
+	s.Tiles[pos.Q][pos.R] = field.Tile{Type: field.GasBoiler, BurnedOut: true}
 
-	refresh := shiftAction{kind: "place", coord: pos, tile: field.CoalChamber, cost: 2}
+	refresh := shiftAction{kind: "place", coord: pos, tile: field.GasBoiler, cost: 3}
 	other := shiftAction{kind: "place", coord: pos, tile: field.Mirror, cost: 1}
 	actions := []shiftAction{other, refresh}
 
@@ -99,7 +99,7 @@ func TestPickShiftActionPrefersBurnedSameTypeRefresh(t *testing.T) {
 	const runs = 1000
 	for i := 0; i < runs; i++ {
 		act := pickShiftAction(rand.New(rand.NewSource(int64(i))), actions, s)
-		if act.tile == field.CoalChamber {
+		if act.tile == field.GasBoiler {
 			refreshCount++
 		}
 	}

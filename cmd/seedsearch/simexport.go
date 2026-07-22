@@ -112,8 +112,6 @@ func writeSimExport(outDir string, o seedsearch.Outcome, chainPrefix []seedsearc
 	cfg.Shift = o.Shift
 	cfg.RandomShift = false
 	cfg.ShiftDemands = o.StartDemands
-	cfg.ReactorRepairBudget = o.ReactorRepairBudget
-	cfg.RepairBudget = o.RepairBudget
 
 	rng := rand.New(rand.NewSource(o.Seed))
 	preview := state.Clone()

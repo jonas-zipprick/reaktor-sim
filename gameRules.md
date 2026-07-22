@@ -17,15 +17,15 @@ Ihr seid die Doppelspitze eines experimentellen sowjetischen Kraftwerks in den 1
 Das Spiel ist **asymmetrisch**:
 
 * **Spieler 1 (Der Anlagenbauer):** Kontrolliert die linke Spielfeldhälfte (den **Reaktor**). Seine Aufgabe ist es, Thermodynamik und Kernphysik zu nutzen, um Wärme-Energie zu erzeugen und in die Mitte zu leiten.  
-* **Spieler 2 (Der Netz-Experte):** Kontrolliert die rechte Spielfeldhälfte (das **Stromnetz**). Seine Aufgabe ist es, die eintreffende Energie aus der Mitte aufzufangen, umzuwandeln und sicher an die Stadt am rechten Spielfeldrand zu liefern.
+* **Spieler 2 (Der Netz-Experte):** Kontrolliert die rechte Spielfeldhälfte (das **Stromnetz**). Seine Aufgabe ist es, die eintreffende Energie aus der Mitte aufzufangen, zu puffern und sicher an die Verbraucher am Spielfeldrand zu verteilen.
 
 ## **2\. Spielaufbau**
 
-* **Der Rahmen:** Das Spiel findet auf einem Hexagon-Raster statt (siehe "Das Spielfeld im Detail"). Links ist die Spielfeldhälfte für Spieler 1, rechts die Spielfeldhälfte für Spieler 2\. Um den Rand von der rechten Hälfte sind Zonen verteilt. Jede Zone hat Bedarfe und Schaden.
+* **Der Rahmen:** Das Spiel findet auf einem Hexagon-Raster statt (siehe "Das Spielfeld im Detail"). Links ist die Spielfeldhälfte für Spieler 1, rechts die Spielfeldhälfte für Spieler 2\. Um den Rand von der rechten Hälfte sind die Verbaucher verteilt. Jeder Verbraucher hat Bedarf   und Schaden.
 * **Zeit-Slider:** Aufgeteilt in Schicht und Monat. So viele Schichten und Monate habt ihr bereits gespielt  
 * **Geldscheine**: Zum Merken wie viel Budget Spieler 1 und 2 diesen Monat noch zur Verfügung stehen  
-* **Der Ursprung (Reaktor-Emitter):** Am äußersten linken Rand liegt der Zünder. Hier startet in jeder Schicht (Runde) die Kettenreaktion. Auch der Zünder kann Schaden sammeln.
-* **Die Schnittstelle (Hauptturbine):** Genau in der Mitte des Rasters liegt die Turbine. Sie ist die zusammen mit der sie berührenden Wand die Senke für den Reaktor und gleichzeitig der Startpunkt für das Stromnetz. Chips auf der Turbine zählen als ungebundene Spannungs-Chips des Spielers 2  
+* **Der Zünder:** Am äußersten linken Rand liegt der Zünder. Hier startet in jeder Schicht die Kettenreaktion. Auch der Zünder kann Schaden sammeln.
+* **Die Turbine:** Genau in der Mitte des Rasters liegt die Turbine. Sie ist die zusammen mit der sie berührenden Wand die Senke für den Reaktor und gleichzeitig der Startpunkt für das Stromnetz. Chips auf der Turbine zählen als ungebundene Spannungs-Chips des Spielers 2  
 * **Die Bürokratie:** Legt die zwei gemischten Kartenstapel (**Ministerium für Finanzen** und **Ministerium für Energiewirtschaft**) bereit. Energiekarten sind in 3 Level eingeteilt. Sortiert euren Stapel so dass zuerst die zwei Level 1 Karten, dann zwei Level 2 Karten und dann 3 Level 3 Karten kommen.  
 * **Richtungswürfel**: Wann immer euch die Regeln auffordern Chips in eine zufällige Richtung abzuschießen, würfelt. Die Zahl bestimmt die Kante. Tipp: Bei mehreren Chips, deren Richtung offen ist, könnt ihr gleich mehrere Würfel auf einmal würfeln (1 pro Chip), um schneller zu simulieren.
 
@@ -90,7 +90,7 @@ Das Spiel verläuft in Monaten. Ein Monat besteht aus 5 Wochen-Schichten. Zu Beg
 
 #### **Optimierung des lokalen Netzes \- Stufe 1**
 
-**Sonderregel:** Transformatoren kosten 2 Geld statt 3 Geld  
+**Sonderregel:** Verteilerstationen kosten 1 Geld statt 2 Geld  
 **Schichtplan:**
 
 | Schicht | Industrie (Oben) | Wohnviertel (Rechts) | Bahn (Unten) | Kraftwerk (Links / Eigenbedarf) |
@@ -175,17 +175,17 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 
 **1\. "Triumph der Schwerindustrie"**
 
-* **Schicht-Budget:** Reaktor: 3 Geld | Stromnetz: 3 Geld.  
+* **Schicht-Budget:** Reaktor: 4 Geld | Stromnetz: 4 Geld.  
 * **Sonderregel:** Kohle ist um 1 Geld günstiger.
 
-**2\. "Nationale Sparmaßnahmen"**
+**2\. "Nationale Sparmaßnahmen"** (ab 2. Monat)
 
-* **Schicht-Budget:** Reaktor: 3 Geld | Stromnetz: 2 Geld.  
+* **Schicht-Budget:** Reaktor: 3 Geld | Stromnetz: 3 Geld.  
 * **Sonderregel:** Keine. Ihr müsst mit dem Schrott arbeiten, den ihr habt.
 
 **3\. Nukleares Wettrüsten**
 
-* **Schicht-Budget:** Reaktor: 4 Geld | Stromnetz: 2 Geld.  
+* **Schicht-Budget:** Reaktor: 5 Geld | Stromnetz: 3 Geld.  
 * **Sonderregel:** Reparaturen von Schaden werden nicht bewilligt. Felder (auch ausgebrante) können weiterhin überbaut werden
 * *Historischer Kontext: In der Anlage Majak fiel 1957 das Kühlsystem für nukleare Abfälle aus. Da das Finanzbüro keine Reparaturmittel bewilligte (um die Produktion nicht zu stören), überhitzte ein Tank und löste den drittschwersten Nuklearunfall der Geschichte aus (Kyshtym-Vorfall).*
 
@@ -196,15 +196,16 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
 
 * **Ablenk-Spiegel (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Teilchen im fixen Winkel ab.  
-* **Kohle-Brennkammer (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Wärme trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Wärme zufällig ab. Im ausgebrannten Zustand leitet Kohle Wärme in eine zufällige Richtung weiter.  
-* **Kühlturm (Kosten: 2 Geld | Ladung: Keine):** Vernichtet von der einen Seite eintreffende Wärme restlos während es die Wärme von der anderen Seite ungehindert durchfliegen lässt.  
+* **Kühlturm (Kosten: 2 Geld | Ladung: Keine):** Vernichtet von der einen Seite eintreffende Wärme restlos während es die Wärme von der anderen Seite ungehindert durchfliegen lässt  (Orientierung des Felds ist releavant).  
+* **Druckventil (Kosten: 2 Geld | initiale Ladung: Keine | maximale Ladung: 2):** Absorbiert Wärme von allen Richtungen bis sich 2 Wärme-Chips angesamelt haben. Schießt dann beide Wärme-Chips in Richtung der Kante 0 ab (Orientierung des Felds ist releavant). Außerdem wird das Spielfeld direkt nach dem Abschus um eins im Uhrzeigersin gedreht.
+* **Erdgas-Kessel (Kosten: 3 Geld | Ladung: 5 Chips):** 1 Wärme trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Wärme zufällig ab. Im ausgebrannten Zustand leitet Kohle Wärme in eine zufällige Richtung weiter.  
 
-* **Erdgas-Kessel (Kosten: 3 Geld | Ladung: 8 Chips | ab 2\. Monat):** 1 Wärme trifft ein \-\> verbraucht 3 Ladung \-\> feuert 4 Wärme ab. Vernichtet einkommende Chips im ausgebrannten Zustand.
+* **Kohlebrennkammer (Kosten: 3 Geld | Ladung: 8 Chips | ab 2\. Monat):** 2 Wärme eingetroffen \-\> verbraucht 2 Ladung \-\> feuert 3 Wärme ab. Eine Ladung darf als ungebundenen Ladung liegen bleiben oder auch mit abgefeuert werden (Spieler entscheided). Wärme Vernichtet einkommende Chips im ausgebrannten Zustand. Übrige ungebundene Ladung am Ende der Schicht wird vernichtet.
 
 * **Absorber-Stab (Kosten: 3 Geld | Ladung: Keine | ab 3.\ Monat):** Vernichtet eintreffende Neutronen restlos. Wärme wird in eine zufällige Richtung weitergeleitet. 
 * **Uran-Platte (Kosten: 5 Geld | Ladung: 2 Chips | ab 3\. Monat):** 1 *Neutron* trifft ein \-\> verbraucht 1 Ladung \-\> feuert 2 Neutronen & 1 Wärme ab. Trifft 1 Wärme ein so wird sie in eine zufällige richtung weitergeschickt.
 
-* **Tokamak-Kammer (Kosten: 8 Geld | Ladung: Unendlich | ab 4\. Monat):** 4 Neutronen treffen ein \-\> feuert 8 Wärme ab
+* **Tokamak-Kammer (Kosten: 8 Geld | Ladung: Unendlich | ab 4\. Monat):** 4 Neutronen treffen ein \-\> feuert 6 Wärme ab
 
 ## **7\. Sektor 2: Das Stromnetz (Felder für Spieler 2\)**
 * **Feld drehen (Kosten: 0):** Drehe ein bereits plaziertes Feld
@@ -213,11 +214,12 @@ Die "Kritische Masse" liegt in diesem Monat bei 10 statt 7 Chips (auf beiden Sei
 * **Feld entfernen (Kosten: 1):** Entferne ein beliebiges Feld
 
 * **Relais / Weiche (Kosten: 1 Geld | Ladung: Keine):** Lenkt eintreffende Spannung im fixen Winkel ab.
-* **Erdung / Widerstand (Kosten: 1 Geld):** Leitet von der einen Seite eintreffende Spannung ab (vernichtet sie) während es die Spannung von der anderen Seite ungehindert durchfliegen lässt. Wichtig bei Überproduktion\!  
-* **Notgenerator (Kosten: 2 Geld | Ladung: 1 Chips):** Schiese jederzeit, wenn Spieler 2 es wünscht nach rechts (Osten). Ist er ausgebrant, so leitet er einkommende Spannungschips in zufällige Richtungen weiter. Ist er noch geladen, so vernichtet er einkommende Spannung ohne sich aufzuladen.
-* **Transformator (Kosten: 3 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
+* **Transformator (Kosten: 2 Geld | Ladung: 6 Chips):** 1 Spannung trifft ein (hochspannung) \-\> verbraucht 1 Ladung \-\> feuert 2 Spannung in zufällige Richtung ab (niederspannung). Ein ausgebrannter Trafo leitet einkommende Chips in eine zufällige Richtung weiter
+* **Erdung (Kosten: 1 Geld):** Leitet von der einen Seite eintreffende Spannung ab (vernichtet sie) während es die Spannung von der anderen Seite ungehindert durchfliegen lässt. Wichtig bei Überproduktion\!  
+* **Verteilerstation (Kosten: 2 Geld | initiale Ladung: Keine | maximale Ladung: 2):** Absorbiert Spannung von allen Richtungen bis sich 2 Spannungs-Chips angesamelt haben. Schießt dann einen Spannungs-Chip richtung Kante 0 und einen richtung Kante 3 ab (Orientierung des Felds ist releavant). Außerdem wird das Spielfeld direkt nach dem Abschus um eins im Uhrzeigersin gedreht.
 
-* **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 4 Chips | ab 2\. Monat):** Nimmt bis zu 5 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 5 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum **Limit von 7 Chips** für die linke Spielhälfte.
+* **Notgenerator (Kosten: 3 Geld | Ladung: 1 Chips | ab 2\. Monat ):** Schiese jederzeit, wenn Spieler 2 es wünscht nach rechts (Osten). Ist er ausgebrant, so leitet er einkommende Spannungschips in zufällige Richtungen weiter. Ist er noch geladen, so vernichtet er einkommende Spannung ohne sich aufzuladen. 
+* **Kondensator-Bank (Kosten: 4 Geld | Ladung: Maximal 4 Chips | ab 2\. Monat):** Nimmt bis zu 4 Spannungs-Chips auf. Diese können einzeln *innerhalb einer Schicht* in eine Richtung der Wahl geschossen werden. Leert sich beim Schichtwechsel komplett. Empfängt der Kondensator mehr als 4 Spannung explodiert er. Nimm das Feld vom Spielgrid und schieße alle Chips in zufällige Richtungen.  Chips im Kondensator zählen nicht zum **Limit von 7 Chips** für die linke Spielhälfte.
 * **Blei-Akkumulator (Kosten: 3 Geld | Ladung: Maximal 2 Chip | ab 2\. Monat):** Wie Kondensator-Bank, aber verliert zu Begin der Schicht 1 Chip anstatt geleert zu werden. Bewege einen Chip auf ungebunden. Dieser Chip fliegt unkontrolliert in eine zufällige Richtung. Statt zu explodieren, werden einkommende Ladungschips in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  
 
 * **Pumpspeicherwerk (Kosten: 4 Geld | Ladung: Maximal 5 Chips | ab 3\. Monat):** Wie Kondensator-Bank, aber muss beim Schichtwechsel überhaupt nicht geleert werden. Statt zu explodieren, wird Spannung in eine zufällige Richtung umgeleitet, falls der speicher voll ist (Spannungs-Spike)  

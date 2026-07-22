@@ -22,8 +22,8 @@ func CampaignMoneyFromChain(chain []Outcome, fin finance.Card) stats.CampaignMon
 
 		shiftBudgetP1 := fin.ReactorBudget + o.StartLeftover.Player1
 		shiftBudgetP2 := fin.GridBudget + o.StartLeftover.Player2
-		spentP1 := shiftBudgetP1 - o.EndLeftover.Player1
-		spentP2 := shiftBudgetP2 - o.EndLeftover.Player2
+		spentP1 := shiftBudgetP1 - o.EndLeftover.Player1 - o.RepairSpentP1
+		spentP2 := shiftBudgetP2 - o.EndLeftover.Player2 - o.RepairSpentP2
 		deltaP1 := o.BoardCosts.Player1 - prevBoard.Player1
 		deltaP2 := o.BoardCosts.Player2 - prevBoard.Player2
 		if rebuild := spentP1 - deltaP1; rebuild > 0 {
@@ -32,6 +32,8 @@ func CampaignMoneyFromChain(chain []Outcome, fin finance.Card) stats.CampaignMon
 		if rebuild := spentP2 - deltaP2; rebuild > 0 {
 			cm.RebuildF[1] += float64(rebuild)
 		}
+		cm.AvgRepairF[0] += float64(o.RepairSpentP1)
+		cm.AvgRepairF[1] += float64(o.RepairSpentP2)
 		prevBoard = o.BoardCosts
 	}
 	return cm

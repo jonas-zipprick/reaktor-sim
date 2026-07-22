@@ -29,6 +29,11 @@ func ChargeLabel(tile field.Tile) string {
 		return fmt.Sprintf("%d/%d", tile.StoredVoltage, info.MaxCharge)
 	case field.Tokamak:
 		return "*"
+	case field.CoalChamber:
+		if tile.UnboundHeat > 0 {
+			return fmt.Sprintf("%d/%d +%dW", tile.Charge, info.MaxCharge, tile.UnboundHeat)
+		}
+		return fmt.Sprintf("%d/%d", tile.Charge, info.MaxCharge)
 	}
 
 	if info.InitialCharge == -1 {
@@ -63,7 +68,7 @@ func Label(state *board.State, c hex.Coord) string {
 	}
 
 	switch tile.Type {
-	case field.Mirror, field.Relay, field.CoolingTower, field.Ground, field.EmergencyGenerator:
+	case field.Mirror, field.Relay, field.CoolingTower, field.Ground, field.EmergencyGenerator, field.PressureValve, field.DistributionStation:
 		return fmt.Sprintf("%s%d", base, tile.Orientation)
 	case field.Superconductor:
 		return fmt.Sprintf("%s%d", base, tile.SuperTarget)
@@ -82,6 +87,10 @@ func baseSymbol(t field.Type) string {
 		return "Kh"
 	case field.CoolingTower:
 		return "Ku"
+	case field.PressureValve:
+		return "Dv"
+	case field.DistributionStation:
+		return "Vs"
 	case field.GasBoiler:
 		return "Eg"
 	case field.AbsorberRod:
@@ -118,9 +127,9 @@ func Legend() []string {
 	return []string{
 		"Zu = Zuender  Tu = Turbine (Schussrichtung pro Chip zufaellig: NO/O/SO)",
 		"au = ausgebrannt  Sp = Spiegel  Re = Relais  Su = Supraleiter  (leere Felder nur Umriss)",
-		"Rotation an Spiegel/Relais/Kuehlturm/Erdung/Notgenerator/Su: NW, NE, E, SE, SW, W (im Uhrzeigersinn)",
-		"Kh = Kohle  Ku = Kuehlturm  Eg = Erdgas  Ab = Absorber  Ur = Uran  Tk = Tokamak",
-		"Tr = Trafo  Er = Erdung  Ng = Notgenerator  Bl = Blei  Kd = Kondensator  Pu = Pumpspeicher  Hv = HV",
+		"Rotation an Spiegel/Relais/Kuehlturm/Druckventil/Verteiler/Erdung/Notgenerator/Su: NW, NE, E, SE, SW, W (im Uhrzeigersinn)",
+		"Kh = Kohle  Ku = Kuehlturm  Dv = Druckventil  Eg = Erdgas  Ab = Absorber  Ur = Uran  Tk = Tokamak",
+		"Tr = Trafo  Er = Erdung  Vs = Verteiler  Ng = Notgenerator  Bl = Blei  Kd = Kondensator  Pu = Pumpspeicher  Hv = HV",
 		"Zahl darunter = Ladung gebunden (n/max, *=unendlich)",
 		"+nW/+nN/+nS = ungebunden (Waerme/Neutron/Spannung)  >nW/>nN/>nS = einkommend",
 		"Rand-Bedarf ausserhalb: I oben  W rechts  b unten  R oben (!n = Schaden)",

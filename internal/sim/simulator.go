@@ -33,22 +33,27 @@ type Chip struct {
 // MaxStepsPerRun is the hard cap on chip resolutions per simulation run.
 const MaxStepsPerRun = 500
 
+// rareFieldUseThreshold: placeable fields with fewer interactions than this
+// during a run count as unused (never or very rarely involved).
+const rareFieldUseThreshold = 2
+
 // Result holds metrics from one simulation run.
 type Result struct {
-	HeatAtTurbine     int
-	ZoneDeliveries    [4]int
-	CriticalFailure   bool
-	CriticalP1        bool // critical mass on player 1 (reactor) side
-	CriticalP2        bool // critical mass on player 2 (grid) side
-	StepLimitExceeded bool
-	Steps             int // chip resolutions executed in this run
-	AllDemandsMet     bool
-	EndDemands        [4]int // remaining demand per board.Zone at run end
-	EndDamage         [4]int // remaining damage per board.Zone at run end
-	EndEmitterDamage  int    // remaining igniter damage at run end
-	Shift             int    // energy-card shift used for this run (1-5)
-	ReactorRepairSpent int   // money spent on igniter repair at shift start
-	RepairSpent       int    // money spent on grid damage repair at shift start
+	HeatAtTurbine      int
+	ZoneDeliveries     [4]int
+	CriticalFailure    bool
+	CriticalP1         bool // critical mass on player 1 (reactor) side
+	CriticalP2         bool // critical mass on player 2 (grid) side
+	StepLimitExceeded  bool
+	Steps              int // chip resolutions executed in this run
+	AllDemandsMet      bool
+	EndDemands         [4]int // remaining demand per board.Zone at run end
+	EndDamage          [4]int // remaining damage per board.Zone at run end
+	EndEmitterDamage   int    // remaining igniter damage at run end
+	Shift              int    // energy-card shift used for this run (1-5)
+	ReactorRepairSpent int    // money spent on igniter repair at shift start
+	RepairSpent        int    // money spent on grid damage repair at shift start
+	UnusedFields       int    // placeable fields with fewer than rareFieldUseThreshold uses
 }
 
 // Snapshot captures board and graph state after a simulation step.
@@ -106,11 +111,13 @@ type engine struct {
 	emitterShootDir int // fixed for entire run (Zünder)
 	turbineShootDir int // >=0 fixed for run; <0 = sample NE/E/SE per converted chip
 	trace           []Snapshot
-	step         int
-	lastResolved Chip
-	hasResolved  bool
-	lostRecorded bool
-	lastEmitted  []Chip // chips released by the latest fuel/cascade reaction
+	step            int
+	lastResolved    Chip
+	hasResolved     bool
+	lostRecorded    bool
+	lastEmitted     []Chip // chips released by the latest fuel/cascade reaction
+	fieldUses       [hex.Cols][hex.Rows]int
+	placedAtStart   [hex.Cols][hex.Rows]bool // placeable non-empty tiles at run start
 }
 
 // Run executes one full shift simulation on a board clone.
@@ -201,7 +208,12 @@ func run(state *board.State, rng *rand.Rand, cfg Config) (Result, *board.State, 
 	} else if hasOutstandingDemand(e.board) {
 		e.queue = append(e.queue, emitterChips(e.board, cfg, e.rng, e.emitterShootDir)...)
 	}
-	e.queue = append(e.queue, shiftStartChips(e.board, e.rng)...)
+	startChips := shiftStartChips(e.board, e.rng)
+	for _, c := range startChips {
+		e.noteFieldUse(c.Pos)
+	}
+	e.queue = append(e.queue, startChips...)
+	e.recordPlacedFields()
 	e.graph = graph.BuildFlow(e.board, e.inFlight())
 
 	e.record("Start")
@@ -247,6 +259,35 @@ func (e *engine) captureEndState() {
 		e.res.EndDamage[z] = e.board.TotalDamage(z)
 	}
 	e.res.EndEmitterDamage = e.board.EmitterDamage
+	e.res.UnusedFields = e.countUnusedFields()
+}
+
+func (e *engine) recordPlacedFields() {
+	for _, c := range board.PlaceableSlots() {
+		if e.board.Tiles[c.Q][c.R].Type != field.Empty {
+			e.placedAtStart[c.Q][c.R] = true
+		}
+	}
+}
+
+func (e *engine) noteFieldUse(c hex.Coord) {
+	if c.Q < 0 || c.Q >= hex.Cols || c.R < 0 || c.R >= hex.Rows {
+		return
+	}
+	e.fieldUses[c.Q][c.R]++
+}
+
+func (e *engine) countUnusedFields() int {
+	n := 0
+	for _, c := range board.PlaceableSlots() {
+		if !e.placedAtStart[c.Q][c.R] {
+			continue
+		}
+		if e.fieldUses[c.Q][c.R] < rareFieldUseThreshold {
+			n++
+		}
+	}
+	return n
 }
 
 func finalizeTrace(snaps []Snapshot) []Snapshot {
@@ -432,6 +473,7 @@ func (e *engine) resolve(chip Chip) {
 		e.recordStep("Leeres Feld", nil)
 		return
 	}
+	e.noteFieldUse(nextPos)
 	if tile.BurnedOut && tryBurnedRedirect(e, nextPos, tile, chip) {
 		return
 	}
@@ -466,7 +508,7 @@ func tryBurnedRedirect(e *engine, pos hex.Coord, tile *field.Tile, chip Chip) bo
 		return false
 	}
 	switch tile.Type {
-	case field.CoalChamber:
+	case field.GasBoiler:
 		if chip.Type != ChipHeat {
 			return false
 		}
@@ -503,12 +545,16 @@ func shiftStartChips(b *board.State, rng *rand.Rand) []Chip {
 }
 
 // shiftEndCleanup applies end-of-shift board cleanup per game rules: capacitor
-// storage is cleared and depleted placeable fields are removed from the board.
+// storage is cleared, leftover unbound coal heat is destroyed, and depleted
+// placeable fields are removed from the board.
 func shiftEndCleanup(b *board.State) {
 	for _, c := range hex.AllBoardCoords {
 		t := &b.Tiles[c.Q][c.R]
 		if t.Type == field.CapacitorBank {
 			t.StoredVoltage = 0
+		}
+		if t.Type == field.CoalChamber {
+			t.UnboundHeat = 0
 		}
 	}
 	for _, c := range board.PlaceableSlots() {
@@ -747,6 +793,7 @@ func (e *engine) maybeVoluntaryFire() bool {
 	}
 	e.lastResolved = e.queue[len(e.queue)-1]
 	e.hasResolved = true
+	e.noteFieldUse(src.pos)
 	e.recordStep("Freiwilliger Schuss", nil)
 	return true
 }
@@ -805,6 +852,15 @@ func looseChipsOnSide(b *board.State, chips []Chip, player1 bool) int {
 	}
 	if player1 {
 		count += b.EmitterDamage
+		for _, c := range hex.AllBoardCoords {
+			if !c.IsPlayer1() {
+				continue
+			}
+			t := b.Tiles[c.Q][c.R]
+			if t.Type == field.CoalChamber {
+				count += t.UnboundHeat
+			}
+		}
 	}
 	if !player1 {
 		// Schadens-Chips are geloest; StoredVoltage in Speichern is gebunden until fired.
@@ -898,10 +954,16 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		return passThrough(chip, pos), false
 
 	case field.CoalChamber:
-		return handleFuel(tile, chip, pos, rng, 1, 2, ChipHeat)
+		return handleCoalChamber(tile, chip, pos, rng)
+
+	case field.PressureValve:
+		return handlePressureValve(tile, chip, pos)
+
+	case field.DistributionStation:
+		return handleDistributionStation(tile, chip, pos)
 
 	case field.GasBoiler:
-		return handleFuel(tile, chip, pos, rng, 3, 4, ChipHeat)
+		return handleFuel(tile, chip, pos, rng, 1, 2, ChipHeat)
 
 	case field.UraniumPlate:
 		if tile.BurnedOut {
@@ -929,7 +991,7 @@ func react(b *board.State, g *graph.Graph, pos hex.Coord, tile *field.Tile, chip
 		tile.TokamakCounter++
 		if tile.TokamakCounter >= 4 {
 			tile.TokamakCounter = 0
-			return emitRandom(pos, rng, ChipHeat, 8), false
+			return emitRandom(pos, rng, ChipHeat, 6), false
 		}
 		return nil, false
 
@@ -1029,6 +1091,89 @@ func handleFuel(tile *field.Tile, chip Chip, pos hex.Coord, rng *rand.Rand, cost
 		out = append(out, Chip{Type: required, Pos: pos, Dir: hex.RandomTravelDir(rng)})
 	}
 	return out, changed
+}
+
+// handleCoalChamber stages the first heat as unbound charge; the second heat
+// consumes another bound charge and fires 3 heat. Monte Carlo fires the staged
+// unbound chip with the burst (4 total), matching the player's optional choice.
+func handleCoalChamber(tile *field.Tile, chip Chip, pos hex.Coord, rng *rand.Rand) ([]Chip, bool) {
+	if tile.BurnedOut {
+		return nil, false
+	}
+	if chip.Type != ChipHeat {
+		return passThrough(chip, pos), false
+	}
+	if tile.Charge <= 0 {
+		return passThrough(chip, pos), false
+	}
+
+	tile.Charge--
+	changed := false
+	if tile.Charge <= 0 {
+		tile.BurnedOut = true
+		changed = true
+	}
+
+	if tile.UnboundHeat == 0 {
+		tile.UnboundHeat = 1
+		return nil, changed
+	}
+
+	// Second heat: fire 3 from fuel + the staged unbound chip.
+	tile.UnboundHeat = 0
+	return emitRandom(pos, rng, ChipHeat, 4), changed
+}
+
+// handlePressureValve absorbs heat until 2 chips are stored, then fires both
+// toward local edge 0 (tile orientation) and rotates one step clockwise.
+func handlePressureValve(tile *field.Tile, chip Chip, pos hex.Coord) ([]Chip, bool) {
+	if chip.Type != ChipHeat {
+		return passThrough(chip, pos), false
+	}
+	max := field.Catalog[field.PressureValve].MaxCharge
+	if max <= 0 {
+		max = 2
+	}
+	tile.Charge++
+	if tile.Charge < max {
+		return nil, false
+	}
+	tile.Charge = 0
+	dir := tile.Orientation.TravelDir()
+	rotateClockwise(tile)
+	return []Chip{
+		{Type: ChipHeat, Pos: pos, Dir: dir},
+		{Type: ChipHeat, Pos: pos, Dir: dir},
+	}, true
+}
+
+// handleDistributionStation absorbs voltage until 2 chips are stored, then
+// fires one chip toward local edge 0 and one toward local edge 3, then rotates
+// one step clockwise.
+func handleDistributionStation(tile *field.Tile, chip Chip, pos hex.Coord) ([]Chip, bool) {
+	if chip.Type != ChipVoltage {
+		return passThrough(chip, pos), false
+	}
+	max := field.Catalog[field.DistributionStation].MaxCharge
+	if max <= 0 {
+		max = 2
+	}
+	tile.Charge++
+	if tile.Charge < max {
+		return nil, false
+	}
+	tile.Charge = 0
+	dir0 := tile.Orientation.TravelDir()
+	dir3 := hex.Rotation((int(tile.Orientation) + 3) % 6).TravelDir()
+	rotateClockwise(tile)
+	return []Chip{
+		{Type: ChipVoltage, Pos: pos, Dir: dir0},
+		{Type: ChipVoltage, Pos: pos, Dir: dir3},
+	}, true
+}
+
+func rotateClockwise(tile *field.Tile) {
+	tile.Orientation = hex.Rotation((int(tile.Orientation) + 1) % 6)
 }
 
 func isFuelEmitter(t field.Type) bool {

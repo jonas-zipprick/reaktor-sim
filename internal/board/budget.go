@@ -2,6 +2,7 @@ package board
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 
@@ -16,9 +17,28 @@ type PlayerLeftover struct {
 	Player2 int
 }
 
+// ShiftSpendResult holds leftover money and repair spending for one shift.
+type ShiftSpendResult struct {
+	Leftover          PlayerLeftover
+	PreRepairSpentP1  int
+	PreRepairSpentP2  int
+	PostRepairSpentP1 int
+	PostRepairSpentP2 int
+}
+
+// TotalRepairP1 returns total reactor repair spending (pre + post purchase).
+func (r ShiftSpendResult) TotalRepairP1() int { return r.PreRepairSpentP1 + r.PostRepairSpentP1 }
+
+// TotalRepairP2 returns total grid repair spending (pre + post purchase).
+func (r ShiftSpendResult) TotalRepairP2() int { return r.PreRepairSpentP2 + r.PostRepairSpentP2 }
+
 // MinFirstShiftFieldSpend is the minimum Geld each player spends on field
 // purchases in shift 1 (strategy heuristic).
 const MinFirstShiftFieldSpend = 2
+
+// minBudgetSpendFraction is the lower bound for the field-spend target as a
+// fraction of available budget (biases spending upward).
+const minBudgetSpendFraction = 0.6
 
 // RandomWithPlayerCosts builds a board spending a random achievable amount up to
 // each player's budget. A budget of 0 leaves that half empty.
@@ -44,30 +64,43 @@ func RandomWithPlayerCosts(rng *rand.Rand, budgetP1, budgetP2, monthFilter, minF
 	return s, PlayerLeftover{Player1: left1, Player2: left2}, nil
 }
 
-const (
-	damageRepairThreshold   = 3
-	damageRepairLikelihood  = 0.9
-)
-
 // SpendShiftBudget spends up to the given per-player budgets on an existing board.
-// It returns the unspent remainder per half.
-// minFieldSpend, when positive and affordable, forces at least that much field spend.
-// When s carries more than damageRepairThreshold total damage chips and repairs
-// are allowed, most draws reserve money for repairs on the affected half.
-func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2, monthFilter, minFieldSpend int, month rules.Month) (PlayerLeftover, error) {
+// It handles repair (pre- and post-purchase) and field purchases.
+// Repair is attempted with probability-based decisions before and after buying fields.
+func SpendShiftBudget(rng *rand.Rand, s *State, budgetP1, budgetP2, monthFilter, minFieldSpend int, month rules.Month) (ShiftSpendResult, error) {
 	if budgetP1 < 0 || budgetP2 < 0 {
-		return PlayerLeftover{}, fmt.Errorf("Schicht-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
+		return ShiftSpendResult{}, fmt.Errorf("Schicht-Budget darf nicht negativ sein (Spieler 1: %d, Spieler 2: %d)", budgetP1, budgetP2)
 	}
+	repairsAllowed := month.RepairsAllowed()
 	ApplyRandomShiftRotations(rng, s)
+
+	var res ShiftSpendResult
+
+	if repairsAllowed {
+		res.PreRepairSpentP1 = s.MaybeRepair(rng, true, budgetP1, true)
+		budgetP1 -= res.PreRepairSpentP1
+		res.PreRepairSpentP2 = s.MaybeRepair(rng, false, budgetP2, true)
+		budgetP2 -= res.PreRepairSpentP2
+	}
+
 	left1, err := spendHalfBudget(rng, s, true, budgetP1, monthFilter, minFieldSpend, month)
 	if err != nil {
-		return PlayerLeftover{}, err
+		return ShiftSpendResult{}, err
 	}
 	left2, err := spendHalfBudget(rng, s, false, budgetP2, monthFilter, minFieldSpend, month)
 	if err != nil {
-		return PlayerLeftover{}, err
+		return ShiftSpendResult{}, err
 	}
-	return PlayerLeftover{Player1: left1, Player2: left2}, nil
+
+	if repairsAllowed {
+		res.PostRepairSpentP1 = s.MaybeRepair(rng, true, left1, false)
+		left1 -= res.PostRepairSpentP1
+		res.PostRepairSpentP2 = s.MaybeRepair(rng, false, left2, false)
+		left2 -= res.PostRepairSpentP2
+	}
+
+	res.Leftover = PlayerLeftover{Player1: left1, Player2: left2}
+	return res, nil
 }
 
 func effectiveMinFieldSpend(minFieldSpend, budget int) int {
@@ -86,7 +119,11 @@ func spendUpToOnSlots(rng *rand.Rand, s *State, slots []hex.Coord, maxBudget int
 		return 0, err
 	}
 	targets := achievableUpTo(planner, maxBudget)
-	if min := effectiveMinFieldSpend(minFieldSpend, maxBudget); min > 0 {
+	min := effectiveMinFieldSpend(minFieldSpend, maxBudget)
+	if floor := budgetSpendFloor(maxBudget); floor > min {
+		min = floor
+	}
+	if min > 0 {
 		targets = filterAtLeast(targets, min)
 	}
 	if len(targets) == 0 {
@@ -128,6 +165,10 @@ func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget, monthFilter
 		return 0, nil
 	}
 	minFields := effectiveMinFieldSpend(minFieldSpend, budget)
+	floor := budgetSpendFloor(budget)
+	if floor > minFields {
+		minFields = floor
+	}
 	targetSpend := pickFieldSpendTarget(rng, budget, s, player1, month, minFields)
 	spent := 0
 	fieldSpent := 0
@@ -159,6 +200,19 @@ func spendHalfBudget(rng *rand.Rand, s *State, player1 bool, budget, monthFilter
 			fieldSpent += act.cost
 		}
 	}
+	// If discrete field costs left us under the spend floor, keep buying
+	// until the floor is reached or no affordable purchase remains.
+	for fieldSpent < floor && budget > 0 {
+		actions := filterFieldPurchaseActions(validShiftActions(s, slots, market, budget, month))
+		if len(actions) == 0 {
+			break
+		}
+		act := pickShiftAction(rng, actions, s)
+		applyShiftAction(s, act, rng, month)
+		spent += act.cost
+		budget -= act.cost
+		fieldSpent += act.cost
+	}
 	return budget, nil
 }
 
@@ -186,26 +240,20 @@ func filterFieldPurchaseActions(actions []shiftAction) []shiftAction {
 	return out
 }
 
-func pickFieldSpendTarget(rng *rand.Rand, budget int, s *State, player1 bool, month rules.Month, minFieldSpend int) int {
+func budgetSpendFloor(budget int) int {
+	if budget <= 0 {
+		return 0
+	}
+	return int(math.Ceil(float64(budget) * minBudgetSpendFraction))
+}
+
+func pickFieldSpendTarget(rng *rand.Rand, budget int, _ *State, _ bool, _ rules.Month, minFieldSpend int) int {
 	if budget <= 0 {
 		return 0
 	}
 	maxSpend := budget
-	if month.RepairsAllowed() && s.TotalBoardDamage() > damageRepairThreshold {
-		damage := s.EmitterDamage
-		if !player1 {
-			damage = s.TotalPlayer2Damage()
-		}
-		if damage > 0 && rng.Float64() < damageRepairLikelihood {
-			reserve := damage
-			if reserve > budget {
-				reserve = budget
-			}
-			maxSpend = budget - reserve
-		}
-	}
-	if minFieldSpend > 0 && minFieldSpend > maxSpend {
-		maxSpend = budget
+	if floor := budgetSpendFloor(budget); floor > minFieldSpend {
+		minFieldSpend = floor
 	}
 	if minFieldSpend > maxSpend {
 		minFieldSpend = maxSpend

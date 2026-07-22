@@ -38,7 +38,7 @@ func TestVoluntaryFireContinuesAfterQueueEmpty(t *testing.T) {
 	s := board.NewEmpty()
 	s.Tiles[2][1] = field.NewTile(field.CoolingTower, 0, 0)
 	s.Tiles[6][1] = field.NewTile(field.CapacitorBank, 0, 0)
-	s.Tiles[6][1].StoredVoltage = 5
+	s.Tiles[6][1].StoredVoltage = 4
 
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{

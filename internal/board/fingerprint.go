@@ -70,12 +70,16 @@ func encodeTiles(s *State) []byte {
 func encodeTile(t field.Tile) []byte {
 	flags := byte(t.Orientation&0x7)<<1 | boolByte(t.BurnedOut)
 	flags |= byte(t.SuperTarget&0x7) << 4
+	pending := byte(t.TokamakCounter)
+	if t.Type == field.CoalChamber {
+		pending = byte(t.UnboundHeat)
+	}
 	return []byte{
 		byte(t.Type),
 		flags,
 		byte(t.Charge),
 		byte(t.StoredVoltage),
-		byte(t.TokamakCounter),
+		pending,
 	}
 }
 
@@ -84,18 +88,23 @@ func decodeTile(b []byte) (field.Tile, error) {
 		return field.Tile{}, fmt.Errorf("ungueltige kachel-Daten")
 	}
 	typ := field.Type(b[0])
-	if typ < field.Empty || typ > field.Superconductor {
+	if typ < field.Empty || typ > field.DistributionStation {
 		return field.Tile{}, fmt.Errorf("ungueltiger feldtyp %d", typ)
 	}
-	return field.Tile{
-		Type:           typ,
-		BurnedOut:      b[1]&1 != 0,
-		Orientation:    hex.Rotation((b[1] >> 1) & 0x7),
-		SuperTarget:    hex.Rotation((b[1] >> 4) & 0x7),
-		Charge:         int(b[2]),
-		StoredVoltage:  int(b[3]),
-		TokamakCounter: int(b[4]),
-	}, nil
+	tile := field.Tile{
+		Type:          typ,
+		BurnedOut:     b[1]&1 != 0,
+		Orientation:   hex.Rotation((b[1] >> 1) & 0x7),
+		SuperTarget:   hex.Rotation((b[1] >> 4) & 0x7),
+		Charge:        int(b[2]),
+		StoredVoltage: int(b[3]),
+	}
+	if typ == field.CoalChamber {
+		tile.UnboundHeat = int(b[4])
+	} else {
+		tile.TokamakCounter = int(b[4])
+	}
+	return tile, nil
 }
 
 func boolByte(v bool) byte {

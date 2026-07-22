@@ -28,98 +28,72 @@ func TestRandomWithPlayerCostsCanLeaveLeftover(t *testing.T) {
 
 func TestSpendShiftBudgetReturnsLeftover(t *testing.T) {
 	s := board.NewEmpty()
-	left, err := board.SpendShiftBudget(rand.New(rand.NewSource(99)), s, 3, 0, 0, 0, rules.Month{})
+	res, err := board.SpendShiftBudget(rand.New(rand.NewSource(99)), s, 3, 0, 0, 0, rules.Month{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if left.Player1 < 0 || left.Player1 > 3 {
-		t.Fatalf("leftover = %d, want 0..3", left.Player1)
+	if res.Leftover.Player1 < 0 || res.Leftover.Player1 > 3 {
+		t.Fatalf("leftover = %d, want 0..3", res.Leftover.Player1)
 	}
 }
 
-func TestSpendShiftBudgetReservesRepairMoneyWhenHighDamage(t *testing.T) {
+func TestSpendShiftBudgetRepairsHighDamage(t *testing.T) {
 	base := board.NewEmpty()
-	base.Damage = [4]int{2, 1, 1, 0} // 4 total across board
+	base.Damage = [4]int{2, 1, 1, 0}
 	month := rules.Month{FinanceID: "schwerindustrie"}
 
-	var totalLeft float64
-	const runs = 300
+	var totalRepair float64
+	const runs = 500
 	for i := 0; i < runs; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
+		res, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
-		totalLeft += float64(left.Player2)
+		totalRepair += float64(res.TotalRepairP2())
 	}
-	avg := totalLeft / runs
-	if avg < 5.5 {
-		t.Fatalf("avg leftover %.2f with 4 total damage, want repair reserve (>= 5.5)", avg)
+	avg := totalRepair / runs
+	if avg < 0.3 {
+		t.Fatalf("avg grid repair %.2f with 4 damage, want > 0.3", avg)
 	}
 }
 
-func TestSpendShiftBudgetReservesEmitterRepairOnTotalBoardDamage(t *testing.T) {
+func TestSpendShiftBudgetRepairsEmitterDamage(t *testing.T) {
 	base := board.NewEmpty()
 	base.EmitterDamage = 2
-	base.Damage = [4]int{1, 1, 0, 0} // 4 total, only 2 on P1
+	base.Damage = [4]int{1, 1, 0, 0}
 	month := rules.Month{FinanceID: "schwerindustrie"}
 
-	var totalLeft float64
-	const runs = 300
+	var totalRepair float64
+	const runs = 500
 	for i := 0; i < runs; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 6, 0, 0, 0, month)
+		res, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 6, 0, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
-		totalLeft += float64(left.Player1)
+		totalRepair += float64(res.TotalRepairP1())
 	}
-	avg := totalLeft / runs
-	if avg < 3.5 {
-		t.Fatalf("avg P1 leftover %.2f with 4 total damage, want emitter repair reserve (>= 3.5)", avg)
-	}
-}
-
-func TestSpendShiftBudgetNoRepairReserveWhenTotalDamageLow(t *testing.T) {
-	base := board.NewEmpty()
-	base.EmitterDamage = 1
-	base.Damage = [4]int{1, 1, 0, 0} // 3 total
-	month := rules.Month{FinanceID: "schwerindustrie"}
-
-	var totalLeft float64
-	const runs = 300
-	for i := 0; i < runs; i++ {
-		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
-		if err != nil {
-			t.Fatal(err)
-		}
-		totalLeft += float64(left.Player2)
-	}
-	avg := totalLeft / runs
-	if avg > 5.5 {
-		t.Fatalf("avg leftover %.2f with 3 total damage, want no strong reserve (<= 5.5)", avg)
+	avg := totalRepair / runs
+	if avg < 0.3 {
+		t.Fatalf("avg reactor repair %.2f with 2 emitter damage, want > 0.3", avg)
 	}
 }
 
-func TestSpendShiftBudgetRepairHeuristicDisabledWithoutRepairs(t *testing.T) {
+func TestSpendShiftBudgetRepairDisabledWithoutRepairs(t *testing.T) {
 	base := board.NewEmpty()
 	base.Damage = [4]int{6, 0, 0, 0}
 	month := rules.Month{FinanceID: "wettruesten"}
 
-	var totalLeft float64
-	const runs = 300
-	for i := 0; i < runs; i++ {
+	for i := 0; i < 100; i++ {
 		s := base.Clone()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
+		res, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, 0, 8, 0, 0, month)
 		if err != nil {
 			t.Fatal(err)
 		}
-		totalLeft += float64(left.Player2)
-	}
-	avg := totalLeft / runs
-	if avg < 3 || avg > 5 {
-		t.Fatalf("avg leftover %.2f without repairs allowed, want ~4 (uniform)", avg)
+		if res.TotalRepairP2() != 0 {
+			t.Fatalf("wettruesten should not allow repair, got %d", res.TotalRepairP2())
+		}
 	}
 }
 
@@ -145,17 +119,44 @@ func TestSpendShiftBudgetMinFirstShiftFieldSpend(t *testing.T) {
 	const budget = 5
 	for seed := int64(1); seed <= 200; seed++ {
 		s := board.NewEmpty()
-		left, err := board.SpendShiftBudget(rand.New(rand.NewSource(seed)), s, budget, budget, 0, board.MinFirstShiftFieldSpend, rules.Month{})
+		res, err := board.SpendShiftBudget(rand.New(rand.NewSource(seed)), s, budget, budget, 0, board.MinFirstShiftFieldSpend, rules.Month{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		spentP1 := budget - left.Player1
-		spentP2 := budget - left.Player2
+		spentP1 := budget - res.Leftover.Player1 - res.TotalRepairP1()
+		spentP2 := budget - res.Leftover.Player2 - res.TotalRepairP2()
 		if spentP1 < board.MinFirstShiftFieldSpend {
-			t.Fatalf("seed %d: P1 spent %d Geld, want >= %d", seed, spentP1, board.MinFirstShiftFieldSpend)
+			t.Fatalf("seed %d: P1 field spend %d Geld, want >= %d", seed, spentP1, board.MinFirstShiftFieldSpend)
 		}
 		if spentP2 < board.MinFirstShiftFieldSpend {
-			t.Fatalf("seed %d: P2 spent %d Geld, want >= %d", seed, spentP2, board.MinFirstShiftFieldSpend)
+			t.Fatalf("seed %d: P2 field spend %d Geld, want >= %d", seed, spentP2, board.MinFirstShiftFieldSpend)
 		}
+	}
+}
+
+func TestSpendShiftBudgetBiasesTowardSpending(t *testing.T) {
+	const budget = 10
+	month := rules.Month{FinanceID: "schwerindustrie"}
+	var sumSpent, sumLeft float64
+	const runs = 500
+	for i := 0; i < runs; i++ {
+		s := board.NewEmpty()
+		res, err := board.SpendShiftBudget(rand.New(rand.NewSource(int64(i))), s, budget, 0, 0, 0, month)
+		if err != nil {
+			t.Fatal(err)
+		}
+		spent := budget - res.Leftover.Player1 - res.TotalRepairP1()
+		sumSpent += float64(spent)
+		sumLeft += float64(res.Leftover.Player1)
+	}
+	avgSpent := sumSpent / runs
+	avgLeft := sumLeft / runs
+	// Target uniform over 6..10 → expected spend ~8 when achievable.
+	// Without bias (0..10) expected leftover would be ~5.
+	if avgSpent < 6.5 {
+		t.Fatalf("avg field spend %.2f, want >= 6.5 with 60%% floor", avgSpent)
+	}
+	if avgLeft > 3.5 {
+		t.Fatalf("avg leftover %.2f, want <= 3.5 with 60%% spend bias", avgLeft)
 	}
 }

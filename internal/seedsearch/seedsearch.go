@@ -76,8 +76,8 @@ type Outcome struct {
 	StartLeftover        board.PlayerLeftover // money carry at shift start
 	EndLeftover          board.PlayerLeftover // unspent money after board purchases
 	CarryBoardFingerprint string              // board after shift simulation carry (burnout cleanup)
-	ReactorRepairBudget  int                // max igniter repair spend per MC run
-	RepairBudget         int                // max grid repair spend per MC run
+	RepairSpentP1        int                // money spent on damage repair (reactor)
+	RepairSpentP2        int                // money spent on damage repair (grid)
 	BoardCosts           board.PlayerCosts
 	Wins                 int
 	AllDemandsNoDamage   int // all demands met, zero damage
@@ -97,6 +97,7 @@ type Outcome struct {
 	AvgReactorRepairSpent float64 // avg money spent on igniter repair per run
 	AvgRepairSpent       float64 // avg money spent on grid damage repair per run
 	AvgSteps             float64
+	AvgUnusedFields      float64 // avg placeable fields rarely/never used per run
 	Runs                 int
 	TraceLoopRun         int // 1-based MC run for loop trace export, 0 = none
 	TraceWinRun          int // 1-based MC run for win trace export, 0 = none
@@ -108,6 +109,20 @@ func (o Outcome) WinRate() float64 {
 		return 0
 	}
 	return float64(o.Wins) / float64(o.Runs)
+}
+
+// WinPercentRounded returns Win% rounded to the nearest 5% (0, 5, 10, … 100).
+func (o Outcome) WinPercentRounded() int {
+	return o.PercentRounded(o.Wins)
+}
+
+// PercentRounded returns hits/Runs*100 rounded to the nearest 5% (0, 5, 10, … 100).
+func (o Outcome) PercentRounded(hits int) int {
+	if o.Runs == 0 {
+		return 0
+	}
+	pct := float64(hits) / float64(o.Runs) * 100
+	return int(math.Round(pct/5) * 5)
 }
 
 // AllDemandsMax1DamageRate returns the fraction of runs with no remaining demand
@@ -158,9 +173,24 @@ func (o Outcome) TotalMedianEndDamage() int {
 	return total
 }
 
+// TotalEndDamage returns total median remaining damage including igniter damage.
+func (o Outcome) TotalEndDamage() int {
+	return o.TotalMedianEndDamage() + o.MedianEndEmitterDamage
+}
+
+// UnusedFieldsRounded returns AvgUnusedFields rounded to the nearest whole number.
+func (o Outcome) UnusedFieldsRounded() int {
+	return int(math.Round(o.AvgUnusedFields))
+}
+
+// StepsRounded returns AvgSteps rounded to the nearest whole number.
+func (o Outcome) StepsRounded() int {
+	return int(math.Round(o.AvgSteps))
+}
+
 // AvgStepsSummary formats the average number of simulation steps per run.
 func (o Outcome) AvgStepsSummary() string {
-	return formatAvg(o.AvgSteps)
+	return fmt.Sprintf("%d", o.StepsRounded())
 }
 
 func (z ZoneTotals) allZero() bool {
@@ -186,14 +216,19 @@ func formatZoneTotals(totals ZoneTotals) string {
 	return strings.Join(parts, " ")
 }
 
-// AvgSavedSummary formats average unspent money after repair as "P1/P2".
+// AvgSavedSummary formats unspent money after repair as "P1/P2".
 func (o Outcome) AvgSavedSummary() string {
-	return fmt.Sprintf("%s/%s", formatAvg(o.AvgSavedP1), formatAvg(o.AvgSavedP2))
+	return fmt.Sprintf("%d/%d", int(math.Round(o.AvgSavedP1)), int(math.Round(o.AvgSavedP2)))
 }
 
-// AvgRepairSummary formats average repair spend per run.
+// AvgRepairSummary formats repair spend as "P1/P2" (reactor/grid).
 func (o Outcome) AvgRepairSummary() string {
-	return formatAvg(o.AvgRepairSpent)
+	return fmt.Sprintf("%d/%d", o.RepairSpentP1, o.RepairSpentP2)
+}
+
+// AvgUnusedFieldsSummary formats the average unused placeable field count.
+func (o Outcome) AvgUnusedFieldsSummary() string {
+	return fmt.Sprintf("%d", o.UnusedFieldsRounded())
 }
 
 func formatAvg(v float64) string {
@@ -211,32 +246,26 @@ func formatAvg(v float64) string {
 // Outcome per shift. The board, remaining demand and damage carry forward.
 func EvaluateChain(seed int64, opts Options) ([]Outcome, error) {
 	rng := rand.New(rand.NewSource(seed))
-	state, endLeft, shift1Prev, err := prepareShift1Board(rng, opts)
+	state, spendRes, shift1Prev, err := prepareShift1Board(rng, opts)
 	if err != nil {
 		return nil, err
 	}
-	return evaluateChain(seed, rng, state, opts, board.PlayerLeftover{}, endLeft, shift1Prev), nil
+	return evaluateChain(seed, rng, state, opts, board.PlayerLeftover{}, spendRes, shift1Prev), nil
 }
 
 // prepareShift1Board builds or loads the shift-1 board and applies this shift's purchases.
-func prepareShift1Board(rng *rand.Rand, opts Options) (*board.State, board.PlayerLeftover, string, error) {
+func prepareShift1Board(rng *rand.Rand, opts Options) (*board.State, board.ShiftSpendResult, string, error) {
 	month := rules.Month{EnergyID: opts.EnergyCard.ID, FinanceID: opts.Finance.ID}
 	if opts.StartBoardFingerprint != "" {
 		state, err := board.FromFingerprint(opts.StartBoardFingerprint)
 		if err != nil {
-			return nil, board.PlayerLeftover{}, "", err
+			return nil, board.ShiftSpendResult{}, "", err
 		}
-		left, err := spendShift1Budget(rng, state, opts, month)
-		return state, left, opts.StartBoardFingerprint, err
+		res, err := board.SpendShiftBudget(rng, state, opts.Finance.ReactorBudget, opts.Finance.GridBudget, opts.MonthFilter, board.MinFirstShiftFieldSpend, month)
+		return state, res, opts.StartBoardFingerprint, err
 	}
 	state, left, err := buildInitialBoard(rng, opts)
-	return state, left, "", err
-}
-
-func spendShift1Budget(rng *rand.Rand, state *board.State, opts Options, month rules.Month) (board.PlayerLeftover, error) {
-	p1 := opts.Finance.ReactorBudget
-	p2 := opts.Finance.GridBudget
-	return board.SpendShiftBudget(rng, state, p1, p2, opts.MonthFilter, board.MinFirstShiftFieldSpend, month)
+	return state, board.ShiftSpendResult{Leftover: left}, "", err
 }
 
 // buildInitialBoard creates the shift-1 board using the finance budget.
@@ -253,7 +282,7 @@ func buildInitialBoard(rng *rand.Rand, opts Options) (*board.State, board.Player
 	return state, left, err
 }
 
-func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options, carryLeft, firstEndLeft board.PlayerLeftover, shift1PrevFP string) []Outcome {
+func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options, carryLeft board.PlayerLeftover, firstSpend board.ShiftSpendResult, shift1PrevFP string) []Outcome {
 	shifts := opts.shiftCount()
 	outcomes := make([]Outcome, 0, shifts)
 	var carryDemand, carryDamage [4]int
@@ -261,16 +290,16 @@ func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options,
 	prevFP := shift1PrevFP
 	for k := 1; k <= shifts; k++ {
 		startLeft := carryLeft
-		var endLeft board.PlayerLeftover
+		var spendRes board.ShiftSpendResult
 		if k == 1 {
-			endLeft = firstEndLeft
+			spendRes = firstSpend
 		} else {
 			state.Damage = carryDamage
 			state.EmitterDamage = carryEmitterDamage
 			budgetP1 := opts.Finance.ReactorBudget + carryLeft.Player1
 			budgetP2 := opts.Finance.GridBudget + carryLeft.Player2
 			var err error
-			endLeft, err = board.SpendShiftBudget(rng, state, budgetP1, budgetP2, opts.MonthFilter, 0, rules.Month{
+			spendRes, err = board.SpendShiftBudget(rng, state, budgetP1, budgetP2, opts.MonthFilter, 0, rules.Month{
 				EnergyID:  opts.EnergyCard.ID,
 				FinanceID: opts.Finance.ID,
 			})
@@ -278,7 +307,7 @@ func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options,
 				return outcomes
 			}
 		}
-		out := evaluateShift(seed, state, opts, k, prevFP, carryDemand, carryDamage, carryEmitterDamage, startLeft, endLeft)
+		out := evaluateShift(seed, state, opts, k, prevFP, carryDemand, carryDamage, carryEmitterDamage, startLeft, spendRes)
 		outcomes = append(outcomes, out)
 		prevFP = out.BoardFingerprint
 		carryDemand = out.MedianEndDemand
@@ -290,8 +319,8 @@ func evaluateChain(seed int64, rng *rand.Rand, state *board.State, opts Options,
 }
 
 // evaluateShift simulates one shift on state (already reflecting this shift's
-// purchases) with the given carried demand/damage, returning the outcome.
-func evaluateShift(seed int64, state *board.State, opts Options, shift int, prevFP string, carryDemand, carryDamage [4]int, carryEmitterDamage int, startLeft, endLeft board.PlayerLeftover) Outcome {
+// purchases and repairs) with the given carried demand/damage, returning the outcome.
+func evaluateShift(seed int64, state *board.State, opts Options, shift int, prevFP string, carryDemand, carryDamage [4]int, carryEmitterDamage int, startLeft board.PlayerLeftover, spendRes board.ShiftSpendResult) Outcome {
 	cardDemand := opts.EnergyCard.ShiftDemands(shift)
 	combined := board.ShiftDemands{
 		Industry:    cardDemand.Industry + carryDemand[board.ZoneIndustry],
@@ -299,8 +328,6 @@ func evaluateShift(seed int64, state *board.State, opts Options, shift int, prev
 		Rail:        cardDemand.Rail + carryDemand[board.ZoneRail],
 		Plant:       cardDemand.Plant + carryDemand[board.ZonePlant],
 	}
-	state.Damage = carryDamage
-	state.EmitterDamage = carryEmitterDamage
 
 	cfg := sim.DefaultConfig()
 	cfg.EnergyCard = opts.EnergyCard
@@ -309,10 +336,8 @@ func evaluateShift(seed int64, state *board.State, opts Options, shift int, prev
 	cfg.Shift = shift
 	cfg.RandomShift = false
 	cfg.ShiftDemands = combined
-	repairsAllowed := opts.Finance.RepairsAllowed()
-	cfg.ReactorRepairBudget = reactorRepairBudget(endLeft.Player1, state, repairsAllowed)
-	cfg.RepairBudget = gridRepairBudget(endLeft.Player2, state, repairsAllowed)
 
+	endLeft := spendRes.Leftover
 	out := evaluatePrepared(seed, state, opts.Runs, cfg, endLeft)
 	out.Shift = shift
 	out.PrevBoardFingerprint = prevFP
@@ -321,15 +346,15 @@ func evaluateShift(seed int64, state *board.State, opts Options, shift int, prev
 	out.StartEmitterDamage = carryEmitterDamage
 	out.StartLeftover = startLeft
 	out.EndLeftover = endLeft
-	out.ReactorRepairBudget = cfg.ReactorRepairBudget
-	out.RepairBudget = cfg.RepairBudget
+	out.RepairSpentP1 = spendRes.TotalRepairP1()
+	out.RepairSpentP2 = spendRes.TotalRepairP2()
 	return out
 }
 
 func evaluatePrepared(seed int64, state *board.State, runs int, cfg sim.Config, endLeft board.PlayerLeftover) Outcome {
 	results := sim.RunMonteCarlo(state, runs, seed, cfg)
 	month := rules.Month{EnergyID: cfg.EnergyCard.ID, FinanceID: cfg.FinanceCard.ID}
-	out := aggregateOutcome(seed, state, runs, cfg.ReactorRepairBudget, cfg.RepairBudget, endLeft, results, month)
+	out := aggregateOutcome(seed, state, runs, endLeft, results, month)
 	if runs > 0 {
 		if loops := sim.LoopTraceRunIndices(results, 1); len(loops) > 0 {
 			out.TraceLoopRun = loops[0]
@@ -344,17 +369,15 @@ func evaluatePrepared(seed int64, state *board.State, runs int, cfg sim.Config, 
 	return out
 }
 
-func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget, gridRepairBudget int, endLeft board.PlayerLeftover, results []sim.Result, month rules.Month) Outcome {
+func aggregateOutcome(seed int64, state *board.State, runs int, endLeft board.PlayerLeftover, results []sim.Result, month rules.Month) Outcome {
 	out := Outcome{
-		Seed:                seed,
-		BoardFingerprint:    board.Fingerprint(state),
-		BoardCosts:          state.PlayerCostsFor(month),
-		Runs:                runs,
-		ReactorRepairBudget: reactorRepairBudget,
-		RepairBudget:        gridRepairBudget,
+		Seed:             seed,
+		BoardFingerprint: board.Fingerprint(state),
+		BoardCosts:       state.PlayerCostsFor(month),
+		Runs:             runs,
 	}
 	var sumDemand, sumDamage ZoneTotals
-	var sumSteps, sumGridRepair, sumReactorRepair, sumSavedP2 float64
+	var sumSteps, sumUnused float64
 	endDemand := make([][]int, 4)
 	endDamage := make([][]int, 4)
 	for z := range endDemand {
@@ -389,13 +412,7 @@ func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget,
 		if res.CriticalP2 {
 			out.CriticalP2++
 		}
-		sumGridRepair += float64(res.RepairSpent)
-		sumReactorRepair += float64(res.ReactorRepairSpent)
-		savedP2 := endLeft.Player2 - res.RepairSpent
-		if savedP2 < 0 {
-			savedP2 = 0
-		}
-		sumSavedP2 += float64(savedP2)
+		sumUnused += float64(res.UnusedFields)
 		for z := board.ZoneIndustry; z <= board.ZonePlant; z++ {
 			sumDemand[z] += float64(res.EndDemands[z])
 			sumDamage[z] += float64(res.EndDamage[z])
@@ -414,14 +431,9 @@ func aggregateOutcome(seed int64, state *board.State, runs, reactorRepairBudget,
 		}
 		out.MedianEndEmitterDamage = medianInt(endEmitter)
 		out.AvgSteps = sumSteps / float64(runs)
-		out.AvgReactorRepairSpent = sumReactorRepair / float64(runs)
-		out.AvgRepairSpent = sumGridRepair / float64(runs)
-		savedP1 := float64(endLeft.Player1) - sumReactorRepair/float64(runs)
-		if savedP1 < 0 {
-			savedP1 = 0
-		}
-		out.AvgSavedP1 = savedP1
-		out.AvgSavedP2 = sumSavedP2 / float64(runs)
+		out.AvgUnusedFields = sumUnused / float64(runs)
+		out.AvgSavedP1 = float64(endLeft.Player1)
+		out.AvgSavedP2 = float64(endLeft.Player2)
 	}
 	return out
 }
@@ -607,19 +619,6 @@ func carryKey(demand, damage [4]int, emitterDamage int, leftover board.PlayerLef
 	return fmt.Sprintf("|d%v|s%v|z%d|g%v", demand, damage, emitterDamage, leftover)
 }
 
-func gridRepairBudget(leftoverP2 int, state *board.State, repairsAllowed bool) int {
-	if !repairsAllowed {
-		return 0
-	}
-	return board.GridRepairBudget(leftoverP2, state)
-}
-
-func reactorRepairBudget(leftoverP1 int, state *board.State, repairsAllowed bool) int {
-	if !repairsAllowed {
-		return 0
-	}
-	return board.ReactorRepairBudget(leftoverP1, state)
-}
 
 // WinningOnly returns outcomes with at least one run where all demands were met.
 func WinningOnly(outcomes []Outcome) []Outcome {
@@ -634,12 +633,7 @@ func WinningOnly(outcomes []Outcome) []Outcome {
 
 // TopWins returns up to n outcomes with the highest win counts.
 func TopWins(outcomes []Outcome, n int) []Outcome {
-	return topN(outcomes, n, func(a, b Outcome) bool {
-		if a.Wins != b.Wins {
-			return a.Wins > b.Wins
-		}
-		return a.Seed < b.Seed
-	})
+	return topN(outcomes, n, lessWins)
 }
 
 // TopLoops returns up to n outcomes with the highest loop counts. Outcomes
@@ -651,45 +645,73 @@ func TopLoops(outcomes []Outcome, n int) []Outcome {
 			withLoops = append(withLoops, o)
 		}
 	}
-	return topN(withLoops, n, func(a, b Outcome) bool {
-		if a.Loops != b.Loops {
-			return a.Loops > b.Loops
-		}
-		return a.Seed < b.Seed
-	})
+	return topN(withLoops, n, lessLoops)
 }
 
 // TopAllDemandsNoDamage returns up to n outcomes with the most runs where all
 // demands were met and no damage remained.
 func TopAllDemandsNoDamage(outcomes []Outcome, n int) []Outcome {
-	return topN(outcomes, n, func(a, b Outcome) bool {
-		if a.AllDemandsNoDamage != b.AllDemandsNoDamage {
-			return a.AllDemandsNoDamage > b.AllDemandsNoDamage
-		}
-		return a.Seed < b.Seed
-	})
+	return topN(outcomes, n, lessAllDemandsNoDamage)
 }
 
 // TopMax1DemandNoDamage returns up to n outcomes with the most runs where at
 // most one demand was unmet and no damage remained.
 func TopMax1DemandNoDamage(outcomes []Outcome, n int) []Outcome {
-	return topN(outcomes, n, func(a, b Outcome) bool {
-		if a.Max1DemandNoDamage != b.Max1DemandNoDamage {
-			return a.Max1DemandNoDamage > b.Max1DemandNoDamage
-		}
-		return a.Seed < b.Seed
-	})
+	return topN(outcomes, n, lessMax1DemandNoDamage)
 }
 
 // TopMax1DemandMax1Damage returns up to n outcomes with the most runs where at
 // most one demand was unmet and at most one damage chip remained.
 func TopMax1DemandMax1Damage(outcomes []Outcome, n int) []Outcome {
-	return topN(outcomes, n, func(a, b Outcome) bool {
-		if a.Max1DemandMax1Damage != b.Max1DemandMax1Damage {
-			return a.Max1DemandMax1Damage > b.Max1DemandMax1Damage
-		}
-		return a.Seed < b.Seed
-	})
+	return topN(outcomes, n, lessMax1DemandMax1Damage)
+}
+
+func lessByUnusedThenSeed(a, b Outcome) bool {
+	if au, bu := a.UnusedFieldsRounded(), b.UnusedFieldsRounded(); au != bu {
+		return au < bu
+	}
+	if ad, bd := a.TotalEndDamage(), b.TotalEndDamage(); ad != bd {
+		return ad < bd
+	}
+	if as, bs := a.StepsRounded(), b.StepsRounded(); as != bs {
+		return as < bs
+	}
+	return a.Seed < b.Seed
+}
+
+func lessWins(a, b Outcome) bool {
+	if ap, bp := a.WinPercentRounded(), b.WinPercentRounded(); ap != bp {
+		return ap > bp
+	}
+	return lessByUnusedThenSeed(a, b)
+}
+
+func lessLoops(a, b Outcome) bool {
+	if a.Loops != b.Loops {
+		return a.Loops > b.Loops
+	}
+	return lessByUnusedThenSeed(a, b)
+}
+
+func lessAllDemandsNoDamage(a, b Outcome) bool {
+	if ap, bp := a.PercentRounded(a.AllDemandsNoDamage), b.PercentRounded(b.AllDemandsNoDamage); ap != bp {
+		return ap > bp
+	}
+	return lessByUnusedThenSeed(a, b)
+}
+
+func lessMax1DemandNoDamage(a, b Outcome) bool {
+	if ap, bp := a.PercentRounded(a.Max1DemandNoDamage), b.PercentRounded(b.Max1DemandNoDamage); ap != bp {
+		return ap > bp
+	}
+	return lessByUnusedThenSeed(a, b)
+}
+
+func lessMax1DemandMax1Damage(a, b Outcome) bool {
+	if ap, bp := a.PercentRounded(a.Max1DemandMax1Damage), b.PercentRounded(b.Max1DemandMax1Damage); ap != bp {
+		return ap > bp
+	}
+	return lessByUnusedThenSeed(a, b)
 }
 
 func totalRemainingDemand(res sim.Result) int {

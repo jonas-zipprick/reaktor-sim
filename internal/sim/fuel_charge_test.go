@@ -10,39 +10,6 @@ import (
 	"github.com/jonas/reaktor-sim/internal/sim"
 )
 
-func TestGasBoilerPartialChargeConsumesAll(t *testing.T) {
-	pos := hex.Coord{Q: 1, R: 2}
-	s := board.NewEmpty()
-	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
-	s.Tiles[pos.Q][pos.R].Charge = 2
-
-	cfg := sim.DefaultConfig()
-	cfg.InitialChips = []sim.Chip{{
-		Type: sim.ChipHeat,
-		Pos:  hex.Coord{Q: 0, R: 2},
-		Dir:  hex.RotE.TravelDir(),
-	}}
-
-	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
-	for _, snap := range snaps {
-		if snap.Event != "Feldreaktion" {
-			continue
-		}
-		tile := snap.Board.Tiles[pos.Q][pos.R]
-		if tile.Type != field.GasBoiler {
-			continue
-		}
-		if tile.Charge != 0 {
-			t.Fatalf("expected charge depleted after partial reaction, got %d", tile.Charge)
-		}
-		if !tile.BurnedOut {
-			t.Fatal("expected gas boiler burned out after last charge spent")
-		}
-		return
-	}
-	t.Fatal("expected gas boiler reaction")
-}
-
 func TestGasBoilerEachReactionReducesCharge(t *testing.T) {
 	pos := hex.Coord{Q: 1, R: 2}
 	s := board.NewEmpty()
@@ -70,4 +37,37 @@ func TestGasBoilerEachReactionReducesCharge(t *testing.T) {
 		}
 		prev = tile.Charge
 	}
+}
+
+func TestGasBoilerLastChargeBurnsOut(t *testing.T) {
+	pos := hex.Coord{Q: 1, R: 2}
+	s := board.NewEmpty()
+	s.Tiles[pos.Q][pos.R] = field.NewTile(field.GasBoiler, 0, 0)
+	s.Tiles[pos.Q][pos.R].Charge = 1
+
+	cfg := sim.DefaultConfig()
+	cfg.InitialChips = []sim.Chip{{
+		Type: sim.ChipHeat,
+		Pos:  hex.Coord{Q: 0, R: 2},
+		Dir:  hex.RotE.TravelDir(),
+	}}
+
+	_, snaps := sim.RunTrace(s, rand.New(rand.NewSource(1)), cfg)
+	for _, snap := range snaps {
+		if snap.Event != "Feldreaktion" {
+			continue
+		}
+		tile := snap.Board.Tiles[pos.Q][pos.R]
+		if tile.Type != field.GasBoiler {
+			continue
+		}
+		if tile.Charge != 0 {
+			t.Fatalf("expected charge depleted, got %d", tile.Charge)
+		}
+		if !tile.BurnedOut {
+			t.Fatal("expected gas boiler burned out after last charge spent")
+		}
+		return
+	}
+	t.Fatal("expected gas boiler reaction")
 }

@@ -235,8 +235,10 @@ func emissionFanParticle(tile *field.Tile) (ParticleType, bool) {
 		return 0, false
 	}
 	switch tile.Type {
-	case field.CoalChamber, field.GasBoiler:
-		return Heat, true
+	case field.CoalChamber:
+		return Heat, tile.Charge > 0 && tile.UnboundHeat > 0
+	case field.GasBoiler:
+		return Heat, tile.Charge > 0
 	case field.Transformer, field.HVCascade:
 		return Voltage, true
 	default:

@@ -9,8 +9,8 @@ import (
 
 func TestEmergencyGeneratorCostAndRotation(t *testing.T) {
 	info := field.Catalog[field.EmergencyGenerator]
-	if info.Cost != 2 {
-		t.Fatalf("cost = %d, want 2", info.Cost)
+	if info.Cost != 3 {
+		t.Fatalf("cost = %d, want 3", info.Cost)
 	}
 	if info.InitialCharge != 1 || info.MaxCharge != 1 {
 		t.Fatalf("charge = %d/%d, want 1/1", info.InitialCharge, info.MaxCharge)

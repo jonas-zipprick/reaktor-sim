@@ -39,9 +39,9 @@ func (m Month) FieldCost(t field.Type) int {
 	}
 	cost := base.Cost
 	switch t {
-	case field.Transformer:
+	case field.DistributionStation:
 		if m.EnergyID == "netzoptimierung" {
-			cost = 2
+			cost = 1
 		}
 	case field.CoalChamber:
 		if m.FinanceID == "schwerindustrie" {

@@ -8,13 +8,19 @@ import (
 )
 
 func TestFieldCostDiscounts(t *testing.T) {
-	if got := (rules.Month{}).FieldCost(field.Transformer); got != 3 {
-		t.Fatalf("transformer base = %d, want 3", got)
+	if got := (rules.Month{}).FieldCost(field.Transformer); got != 2 {
+		t.Fatalf("transformer base = %d, want 2", got)
+	}
+	if got := (rules.Month{}).FieldCost(field.DistributionStation); got != 2 {
+		t.Fatalf("distribution station base = %d, want 2", got)
 	}
 
 	netz := rules.Month{EnergyID: "netzoptimierung"}
+	if got := netz.FieldCost(field.DistributionStation); got != 1 {
+		t.Fatalf("distribution station netz = %d, want 1", got)
+	}
 	if got := netz.FieldCost(field.Transformer); got != 2 {
-		t.Fatalf("transformer = %d, want 2", got)
+		t.Fatalf("transformer under netz = %d, want 2 (no discount)", got)
 	}
 
 	tech := rules.Month{EnergyID: "technologische-transformation"}
@@ -23,8 +29,8 @@ func TestFieldCostDiscounts(t *testing.T) {
 	}
 
 	ind := rules.Month{FinanceID: "schwerindustrie"}
-	if got := ind.FieldCost(field.CoalChamber); got != 1 {
-		t.Fatalf("coal schwerindustrie = %d, want 1", got)
+	if got := ind.FieldCost(field.CoalChamber); got != 2 {
+		t.Fatalf("coal schwerindustrie = %d, want 2", got)
 	}
 	if got := ind.FieldCost(field.UraniumPlate); got != 5 {
 		t.Fatalf("uran schwerindustrie = %d, want 5 (no discount)", got)
@@ -33,8 +39,8 @@ func TestFieldCostDiscounts(t *testing.T) {
 
 func TestInitialChargeModifiers(t *testing.T) {
 	gossnab := rules.Month{EnergyID: "gossnab"}
-	if got := gossnab.InitialCharge(field.CoalChamber); got != 3 {
-		t.Fatalf("coal = %d, want 3", got)
+	if got := gossnab.InitialCharge(field.CoalChamber); got != 7 {
+		t.Fatalf("coal = %d, want 7", got)
 	}
 	if got := gossnab.InitialCharge(field.Transformer); got != 5 {
 		t.Fatalf("transformer = %d, want 5", got)

@@ -9,12 +9,12 @@ import (
 
 func TestSpendShiftBudgetRemovesAndPlaces(t *testing.T) {
 	prev := Random(rand.New(rand.NewSource(42)), 0)
-	unchanged := prev.Clone()
+	before := Fingerprint(prev)
 
 	if _, err := SpendShiftBudget(rand.New(rand.NewSource(3)), prev, 5, 0, 0, 0, rules.Month{}); err != nil {
 		t.Fatal(err)
 	}
-	if prev.PlayerCosts() == unchanged.PlayerCosts() {
+	if Fingerprint(prev) == before {
 		t.Fatal("expected board to change after spending budget")
 	}
 }

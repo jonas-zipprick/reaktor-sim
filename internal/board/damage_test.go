@@ -40,40 +40,12 @@ func TestBorderDamageEvent(t *testing.T) {
 	}
 }
 
-func TestReactorRepairBudget(t *testing.T) {
-	s := board.NewEmpty()
-	s.EmitterDamage = 3
-	if got := board.ReactorRepairBudget(0, s); got != 0 {
-		t.Fatalf("no leftover = %d, want 0", got)
-	}
-	if got := board.ReactorRepairBudget(2, s); got != 2 {
-		t.Fatalf("limited by money = %d, want 2", got)
-	}
-	if got := board.ReactorRepairBudget(10, s); got != 3 {
-		t.Fatalf("limited by damage = %d, want 3", got)
-	}
-}
-
 func TestRepairEmitterDamage(t *testing.T) {
 	s := board.NewEmpty()
 	s.EmitterDamage = 4
 	spent := s.RepairEmitterDamage(2)
 	if spent != 2 || s.EmitterDamage != 2 {
 		t.Fatalf("spent=%d damage=%d, want 2/2", spent, s.EmitterDamage)
-	}
-}
-
-func TestGridRepairBudget(t *testing.T) {
-	s := board.NewEmpty()
-	s.Damage = [4]int{2, 1, 0, 0}
-	if got := board.GridRepairBudget(0, s); got != 0 {
-		t.Fatalf("no leftover = %d, want 0", got)
-	}
-	if got := board.GridRepairBudget(2, s); got != 2 {
-		t.Fatalf("limited by money = %d, want 2", got)
-	}
-	if got := board.GridRepairBudget(10, s); got != 3 {
-		t.Fatalf("limited by damage = %d, want 3", got)
 	}
 }
 
@@ -87,5 +59,83 @@ func TestRepairRandomDamage(t *testing.T) {
 	}
 	if s.TotalPlayer2Damage() != 2 {
 		t.Fatalf("remaining damage = %d, want 2", s.TotalPlayer2Damage())
+	}
+}
+
+func TestRepairHalf(t *testing.T) {
+	rng := rand.New(rand.NewSource(42))
+	s := board.NewEmpty()
+	s.EmitterDamage = 3
+	spent := s.RepairHalf(rng, true, 5)
+	if spent < 1 || spent > 3 {
+		t.Fatalf("reactor repair spent = %d, want 1..3", spent)
+	}
+	if s.EmitterDamage != 3-spent {
+		t.Fatalf("remaining emitter damage = %d, want %d", s.EmitterDamage, 3-spent)
+	}
+
+	s2 := board.NewEmpty()
+	s2.Damage = [4]int{2, 1, 0, 0}
+	spent2 := s2.RepairHalf(rand.New(rand.NewSource(7)), false, 10)
+	if spent2 < 1 || spent2 > 3 {
+		t.Fatalf("grid repair spent = %d, want 1..3", spent2)
+	}
+}
+
+func TestMaybeRepairChances(t *testing.T) {
+	const trials = 2000
+	s := board.NewEmpty()
+	s.Damage = [4]int{5, 0, 0, 0} // > threshold
+
+	preCount := 0
+	postCount := 0
+	for i := 0; i < trials; i++ {
+		clone := s.Clone()
+		rng := rand.New(rand.NewSource(int64(i)))
+		if clone.MaybeRepair(rng, false, 5, true) > 0 {
+			preCount++
+		}
+		clone = s.Clone()
+		rng = rand.New(rand.NewSource(int64(i + trials)))
+		if clone.MaybeRepair(rng, false, 5, false) > 0 {
+			postCount++
+		}
+	}
+	preRate := float64(preCount) / trials
+	postRate := float64(postCount) / trials
+	if preRate < 0.40 || preRate > 0.60 {
+		t.Fatalf("pre-purchase repair rate %.2f, want ~0.50 for high damage", preRate)
+	}
+	if postRate < 0.70 || postRate > 0.90 {
+		t.Fatalf("post-purchase repair rate %.2f, want ~0.80 for high damage", postRate)
+	}
+}
+
+func TestMaybeRepairLowDamage(t *testing.T) {
+	const trials = 2000
+	s := board.NewEmpty()
+	s.Damage = [4]int{2, 0, 0, 0} // <= threshold
+
+	preCount := 0
+	postCount := 0
+	for i := 0; i < trials; i++ {
+		clone := s.Clone()
+		rng := rand.New(rand.NewSource(int64(i)))
+		if clone.MaybeRepair(rng, false, 5, true) > 0 {
+			preCount++
+		}
+		clone = s.Clone()
+		rng = rand.New(rand.NewSource(int64(i + trials)))
+		if clone.MaybeRepair(rng, false, 5, false) > 0 {
+			postCount++
+		}
+	}
+	preRate := float64(preCount) / trials
+	postRate := float64(postCount) / trials
+	if preRate < 0.10 || preRate > 0.30 {
+		t.Fatalf("pre-purchase repair rate %.2f, want ~0.20 for low damage", preRate)
+	}
+	if postRate < 0.30 || postRate > 0.50 {
+		t.Fatalf("post-purchase repair rate %.2f, want ~0.40 for low damage", postRate)
 	}
 }

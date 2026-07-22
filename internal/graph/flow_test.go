@@ -47,12 +47,12 @@ func TestBuildFlowStartOnlyEmitterEdge(t *testing.T) {
 
 func TestBuildPotentialIncludesReactiveFields(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][2] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[1][2] = field.NewTile(field.GasBoiler, 0, 0)
 
 	potential := graph.BuildPotential(s)
-	coal := potential.Nodes[hex.Coord{Q: 1, R: 2}]
-	if len(coal.Edges) == 0 {
-		t.Fatal("potential graph should show reactive edges for coal")
+	gas := potential.Nodes[hex.Coord{Q: 1, R: 2}]
+	if len(gas.Edges) == 0 {
+		t.Fatal("potential graph should show reactive edges for gas boiler")
 	}
 }
 

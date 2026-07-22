@@ -222,7 +222,40 @@ func narrateFieldHit(chip Chip, target hex.Coord, tile field.Tile, queue []Chip,
 	}
 
 	switch tile.Type {
-	case field.CoalChamber, field.GasBoiler, field.Transformer, field.HVCascade:
+	case field.CoalChamber:
+		if chip.Type == ChipHeat {
+			if len(released) > 0 {
+				return fmt.Sprintf(
+					"%s trifft %s. %s schießt %s ab. %s",
+					incoming, name, capitalize(name), formatChipCount(released), formatDirRolls(released),
+				)
+			}
+			return fmt.Sprintf("%s trifft %s und bleibt als ungebundene Ladung liegen (%d/2).", incoming, name, tile.UnboundHeat)
+		}
+
+	case field.PressureValve:
+		if chip.Type == ChipHeat {
+			if len(released) > 0 {
+				return fmt.Sprintf(
+					"%s trifft %s. %s öffnet und schießt %s ab, dann dreht sich das Feld. %s",
+					incoming, name, capitalize(name), formatChipCount(released), formatDirRolls(released),
+				)
+			}
+			return fmt.Sprintf("%s trifft %s und wird gespeichert (%d/2).", incoming, name, tile.Charge)
+		}
+
+	case field.DistributionStation:
+		if chip.Type == ChipVoltage {
+			if len(released) > 0 {
+				return fmt.Sprintf(
+					"%s trifft %s. %s verteilt %s, dann dreht sich das Feld. %s",
+					incoming, name, capitalize(name), formatChipCount(released), formatDirRolls(released),
+				)
+			}
+			return fmt.Sprintf("%s trifft %s und wird gespeichert (%d/2).", incoming, name, tile.Charge)
+		}
+
+	case field.GasBoiler, field.Transformer, field.HVCascade:
 		if len(released) > 0 && len(emitted) > 0 {
 			return fmt.Sprintf(
 				"%s trifft %s. %s schießt %s ab. %s",
@@ -419,9 +452,13 @@ func chipAccusative(t ChipType) string {
 func fieldShortName(t field.Type) string {
 	switch t {
 	case field.CoalChamber:
-		return "die Kohle"
+		return "die Kohlebrennkammer"
+	case field.PressureValve:
+		return "das Druckventil"
+	case field.DistributionStation:
+		return "die Verteilerstation"
 	case field.GasBoiler:
-		return "das Erdgas"
+		return "den Erdgas-Kessel"
 	case field.UraniumPlate:
 		return "Uran"
 	case field.Tokamak:

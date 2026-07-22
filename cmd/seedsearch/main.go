@@ -35,7 +35,7 @@ func main() {
 	workers := flag.Int("workers", 0, "Parallele Scan-Worker (0 = GOMAXPROCS)")
 	topSims := flag.Bool("top-sims", true, "Top-Sim-Ordner mit Trace-Grafiken exportieren")
 	tracePNG := flag.Bool("trace-png", true, "Schritt-PNGs in Top-Sim-Traces schreiben")
-	topSimCharts := flag.Bool("top-sim-charts", false, "Zusatz-Charts je Top-Sim (fuehrt Monte-Carlo erneut aus)")
+	topSimCharts := flag.Bool("top-sim-charts", true, "Zusatz-Charts je Top-Sim (fuehrt Monte-Carlo erneut aus)")
 	outFull := flag.Bool("out-full", false, "YAML enthaelt alle Outcomes (sonst nur Top-Listen)")
 	spillDir := flag.String("spill-dir", "", "Verzeichnis fuer ausgelagerte Schicht-Ergebnisse (leer = bei -schichten>1 auto unter -charts-dir/.spill)")
 	spillMemoryMB := flag.Int("spill-memory-mb", 1024, "Schicht-Ergebnisse erst ab dieser Prozess-Speichernutzung auf Disk (0 = immer wenn -spill-dir aktiv)")
@@ -319,6 +319,8 @@ var prevBoardFpCol = col{"Vorschicht-Board", 16, func(o seedsearch.Outcome) stri
 var avgSavedCol = col{"ø Gespart", 9, func(o seedsearch.Outcome) string { return o.AvgSavedSummary() }}
 var avgRepairCol = col{"ø Reparatur", 11, func(o seedsearch.Outcome) string { return o.AvgRepairSummary() }}
 
+var avgUnusedCol = col{"Unbenutzt", 10, func(o seedsearch.Outcome) string { return o.AvgUnusedFieldsSummary() }}
+
 var winCols = []col{
 	{"Seed", 10, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Seed) }},
 	boardFpCol,
@@ -328,7 +330,8 @@ var winCols = []col{
 	avgSavedCol,
 	avgRepairCol,
 	{"Wins", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Wins) }},
-	{"Win%", 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%.1f", o.WinRate()*100) }},
+	{"Win%", 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.WinPercentRounded()) }},
+	avgUnusedCol,
 	{"Loops", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Loops) }},
 	avgStepsCol,
 	{"Kritisch P1", 11, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.CriticalP1) }},
@@ -347,6 +350,7 @@ var loopCols = []col{
 	avgRepairCol,
 	{"Loops", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Loops) }},
 	{"Loop%", 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%.1f", o.LoopRate()*100) }},
+	avgUnusedCol,
 	{"Wins", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Wins) }},
 	avgStepsCol,
 	{"Kritisch P1", 11, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.CriticalP1) }},
@@ -370,11 +374,9 @@ func scoreCols(scoreTitle string, score func(seedsearch.Outcome) int) []col {
 		avgRepairCol,
 		{scoreTitle, 7, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", score(o)) }},
 		{"%", 7, func(o seedsearch.Outcome) string {
-			if o.Runs == 0 {
-				return "0.0"
-			}
-			return fmt.Sprintf("%.1f", float64(score(o))/float64(o.Runs)*100)
+			return fmt.Sprintf("%d", o.PercentRounded(score(o)))
 		}},
+		avgUnusedCol,
 		{"Wins", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Wins) }},
 		{"Loops", 6, func(o seedsearch.Outcome) string { return fmt.Sprintf("%d", o.Loops) }},
 		avgStepsCol,
@@ -493,8 +495,10 @@ type outcomeYAML struct {
 	AvgEndDemand         zoneTotalsYAML `yaml:"avg_end_demand"`
 	AvgEndDamage         zoneTotalsYAML `yaml:"avg_end_damage"`
 	AvgSaved             leftoverYAML   `yaml:"avg_saved"`
-	AvgRepairSpent       float64        `yaml:"avg_repair_spent"`
+	RepairSpentP1        int            `yaml:"repair_spent_p1"`
+	RepairSpentP2        int            `yaml:"repair_spent_p2"`
 	AvgSteps             float64        `yaml:"avg_steps"`
+	AvgUnusedFields      float64        `yaml:"avg_unused_fields"`
 	WinRate              float64        `yaml:"win_rate"`
 	LoopRate             float64        `yaml:"loop_rate"`
 }
@@ -577,8 +581,10 @@ func toOutcomeYAML(in []seedsearch.Outcome) []outcomeYAML {
 				Reaktor:   int(math.Round(o.AvgSavedP1)),
 				Stromnetz: int(math.Round(o.AvgSavedP2)),
 			},
-			AvgRepairSpent:       o.AvgRepairSpent,
+			RepairSpentP1:        o.RepairSpentP1,
+			RepairSpentP2:        o.RepairSpentP2,
 			AvgSteps:             o.AvgSteps,
+			AvgUnusedFields:      o.AvgUnusedFields,
 			WinRate:              o.WinRate(),
 			LoopRate:             o.LoopRate(),
 		}

@@ -14,7 +14,7 @@ func TestCapacitorExplodesWhenFull(t *testing.T) {
 	pos := hex.Coord{Q: 6, R: 1}
 	s := board.NewEmpty()
 	s.Tiles[pos.Q][pos.R] = field.NewTile(field.CapacitorBank, 0, 0)
-	s.Tiles[pos.Q][pos.R].StoredVoltage = 5
+	s.Tiles[pos.Q][pos.R].StoredVoltage = 4
 
 	cfg := sim.DefaultConfig()
 	cfg.InitialChips = []sim.Chip{{
@@ -34,7 +34,7 @@ func TestCapacitorExplodesWhenFull(t *testing.T) {
 		}
 	}
 	if !exploded {
-		t.Fatal("expected capacitor explosion when receiving 6th voltage")
+		t.Fatal("expected capacitor explosion when receiving 5th voltage")
 	}
 }
 

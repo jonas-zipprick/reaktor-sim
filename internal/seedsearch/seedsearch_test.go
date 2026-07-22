@@ -43,7 +43,7 @@ func TestEvaluateChainDeterministic(t *testing.T) {
 }
 
 func TestEvaluateChainInitialBoardCosts(t *testing.T) {
-	fin, ok := finance.ByID("schwerindustrie") // Reaktor 3 | Stromnetz 3
+	fin, ok := finance.ByID("schwerindustrie") // Reaktor 4 | Stromnetz 4
 	if !ok {
 		t.Fatal("finance card missing")
 	}
@@ -56,8 +56,8 @@ func TestEvaluateChainInitialBoardCosts(t *testing.T) {
 	}
 	spent := chain[0].BoardCosts
 	left := chain[0].EndLeftover
-	if spent.Player1+left.Player1 != 3 || spent.Player2+left.Player2 != 3 {
-		t.Fatalf("shift-1 spend %+v + rest %+v != budget 3/3", spent, left)
+	if spent.Player1+left.Player1 != 4 || spent.Player2+left.Player2 != 4 {
+		t.Fatalf("shift-1 spend %+v + rest %+v != budget 4/4", spent, left)
 	}
 }
 
@@ -235,12 +235,12 @@ func TestTopWinsAndLoops(t *testing.T) {
 func TestTopDemandDamageCategories(t *testing.T) {
 	outcomes := []seedsearch.Outcome{
 		{Seed: 1, AllDemandsNoDamage: 1, Max1DemandNoDamage: 2, Max1DemandMax1Damage: 3, Runs: 10},
-		{Seed: 2, AllDemandsNoDamage: 4, Max1DemandNoDamage: 4, Max1DemandMax1Damage: 4, Runs: 10},
-		{Seed: 3, AllDemandsNoDamage: 4, Max1DemandNoDamage: 5, Max1DemandMax1Damage: 6, Runs: 10},
+		{Seed: 2, AllDemandsNoDamage: 4, Max1DemandNoDamage: 4, Max1DemandMax1Damage: 4, AvgUnusedFields: 3, Runs: 10},
+		{Seed: 3, AllDemandsNoDamage: 4, Max1DemandNoDamage: 5, Max1DemandMax1Damage: 6, AvgUnusedFields: 1, Runs: 10},
 	}
 	clean := seedsearch.TopAllDemandsNoDamage(outcomes, 2)
-	if len(clean) != 2 || clean[0].Seed != 2 || clean[1].Seed != 3 {
-		t.Fatalf("top all demands no damage = %+v", clean)
+	if len(clean) != 2 || clean[0].Seed != 3 || clean[1].Seed != 2 {
+		t.Fatalf("top all demands no damage = %+v, want seed 3 then 2 (fewer unused)", clean)
 	}
 	near := seedsearch.TopMax1DemandNoDamage(outcomes, 2)
 	if len(near) != 2 || near[0].Seed != 3 || near[1].Seed != 2 {
@@ -249,6 +249,68 @@ func TestTopDemandDamageCategories(t *testing.T) {
 	low := seedsearch.TopMax1DemandMax1Damage(outcomes, 2)
 	if len(low) != 2 || low[0].Seed != 3 || low[1].Seed != 2 {
 		t.Fatalf("top max1 demand max1 damage = %+v", low)
+	}
+}
+
+func TestTopTrefferSortsByRoundedPercent(t *testing.T) {
+	outcomes := []seedsearch.Outcome{
+		{Seed: 1, AllDemandsNoDamage: 53, Runs: 100}, // 53% -> 55%
+		{Seed: 2, AllDemandsNoDamage: 50, Runs: 100}, // 50% -> 50%
+		{Seed: 3, AllDemandsNoDamage: 29, Runs: 50},  // 58% -> 60%
+	}
+	top := seedsearch.TopAllDemandsNoDamage(outcomes, 3)
+	if len(top) != 3 || top[0].Seed != 3 || top[1].Seed != 1 || top[2].Seed != 2 {
+		t.Fatalf("top treffer = %+v, want seeds 3,1,2 by rounded %%", top)
+	}
+}
+
+func TestTopWinsPrefersFewerUnusedFields(t *testing.T) {
+	outcomes := []seedsearch.Outcome{
+		{Seed: 1, Wins: 5, AvgUnusedFields: 4, Runs: 10},
+		{Seed: 2, Wins: 5, AvgUnusedFields: 1, Runs: 10},
+		{Seed: 3, Wins: 3, AvgUnusedFields: 0, Runs: 10},
+	}
+	wins := seedsearch.TopWins(outcomes, 2)
+	if len(wins) != 2 || wins[0].Seed != 2 || wins[1].Seed != 1 {
+		t.Fatalf("top wins = %+v, want seed 2 then 1", wins)
+	}
+}
+
+func TestTopWinsSortsUnusedRounded(t *testing.T) {
+	outcomes := []seedsearch.Outcome{
+		{Seed: 1, Wins: 5, AvgUnusedFields: 1.6, Runs: 10}, // rounds to 2
+		{Seed: 2, Wins: 5, AvgUnusedFields: 1.4, Runs: 10}, // rounds to 1
+	}
+	wins := seedsearch.TopWins(outcomes, 2)
+	if len(wins) != 2 || wins[0].Seed != 2 || wins[1].Seed != 1 {
+		t.Fatalf("top wins = %+v, want seed 2 then 1 by rounded unused", wins)
+	}
+}
+
+func TestTopWinsPrefersLessDamageThenFewerSteps(t *testing.T) {
+	outcomes := []seedsearch.Outcome{
+		{Seed: 1, Wins: 5, AvgUnusedFields: 1, MedianEndDamage: [4]int{2, 0, 0, 0}, AvgSteps: 10, Runs: 10},
+		{Seed: 2, Wins: 5, AvgUnusedFields: 1, MedianEndDamage: [4]int{1, 0, 0, 0}, AvgSteps: 12.4, Runs: 10},
+		{Seed: 3, Wins: 5, AvgUnusedFields: 1, MedianEndDamage: [4]int{1, 0, 0, 0}, AvgSteps: 8.6, Runs: 10},
+	}
+	wins := seedsearch.TopWins(outcomes, 3)
+	if len(wins) != 3 || wins[0].Seed != 3 || wins[1].Seed != 2 || wins[2].Seed != 1 {
+		t.Fatalf("top wins = %+v, want seeds 3,2,1 by damage then steps", wins)
+	}
+}
+
+func TestTopWinsSortsByRoundedWinPercent(t *testing.T) {
+	outcomes := []seedsearch.Outcome{
+		{Seed: 1, Wins: 53, Runs: 100}, // 53% -> 55%
+		{Seed: 2, Wins: 50, Runs: 100}, // 50% -> 50%
+		{Seed: 3, Wins: 29, Runs: 50},  // 58% -> 60%
+	}
+	wins := seedsearch.TopWins(outcomes, 3)
+	if len(wins) != 3 || wins[0].Seed != 3 || wins[1].Seed != 1 || wins[2].Seed != 2 {
+		t.Fatalf("top wins = %+v, want seeds 3,1,2 by rounded Win%%", wins)
+	}
+	if outcomes[0].WinPercentRounded() != 55 || outcomes[2].WinPercentRounded() != 60 {
+		t.Fatalf("rounded percents = %d, %d", outcomes[0].WinPercentRounded(), outcomes[2].WinPercentRounded())
 	}
 }
 

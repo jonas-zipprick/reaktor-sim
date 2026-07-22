@@ -340,7 +340,8 @@ func placeTile(s *State, c hex.Coord, t field.Type, rng *rand.Rand, month rules.
 		superTarget = hex.RandomRotation(rng)
 	}
 	if t == field.Relay || t == field.Mirror || t == field.CoolingTower ||
-		t == field.Ground || t == field.EmergencyGenerator {
+		t == field.Ground || t == field.EmergencyGenerator || t == field.PressureValve ||
+		t == field.DistributionStation {
 		orient = hex.RandomRotation(rng)
 	}
 	s.Tiles[c.Q][c.R] = field.NewTile(t, orient, superTarget)

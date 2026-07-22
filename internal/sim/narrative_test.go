@@ -34,7 +34,7 @@ func TestTraceNarrativeCoalReaction(t *testing.T) {
 	if snaps[1].Narrative == snaps[1].Event {
 		t.Fatalf("narrative should be descriptive, got %q", n)
 	}
-	if !strings.Contains(n, "Kohle") {
+	if !strings.Contains(n, "Kohlebrennkammer") {
 		t.Fatalf("expected coal mention, got %q", n)
 	}
 }

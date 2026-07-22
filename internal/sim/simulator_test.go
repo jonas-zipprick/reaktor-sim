@@ -12,9 +12,9 @@ import (
 
 func TestHeatReachesTurbineOnOpenPath(t *testing.T) {
 	s := board.NewEmpty()
-	s.Tiles[1][2] = field.NewTile(field.CoalChamber, 0, 0)
-	s.Tiles[2][2] = field.NewTile(field.CoalChamber, 0, 0)
-	s.Tiles[3][2] = field.NewTile(field.CoalChamber, 0, 0)
+	s.Tiles[1][2] = field.NewTile(field.GasBoiler, 0, 0)
+	s.Tiles[2][2] = field.NewTile(field.GasBoiler, 0, 0)
+	s.Tiles[3][2] = field.NewTile(field.GasBoiler, 0, 0)
 
 	rng := rand.New(rand.NewSource(1))
 	cfg := sim.DefaultConfig()

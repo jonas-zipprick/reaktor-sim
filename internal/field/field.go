@@ -29,6 +29,10 @@ const (
 	PumpedStorage
 	HVCascade
 	Superconductor
+
+	// Appended to keep existing Type values stable.
+	PressureValve
+	DistributionStation
 )
 
 // Info holds static metadata for a field type.
@@ -44,31 +48,33 @@ type Info struct {
 var Catalog = map[Type]Info{
 	Remove:             {Name: "Feld entfernen", Cost: 1, Sector: "reactor"},
 	Mirror:             {Name: "Ablenk-Spiegel", Cost: 1, Sector: "reactor"},
-	CoalChamber:        {Name: "Kohle-Brennkammer", Cost: 2, InitialCharge: 4, MaxCharge: 4, Sector: "reactor"},
+	CoalChamber:        {Name: "Kohlebrennkammer", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "reactor", AvailableFromMonth: 2},
 	CoolingTower:       {Name: "Kühlturm", Cost: 2, Sector: "reactor"},
-	GasBoiler:          {Name: "Erdgas-Kessel", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "reactor", AvailableFromMonth: 2},
+	GasBoiler:          {Name: "Erdgas-Kessel", Cost: 3, InitialCharge: 5, MaxCharge: 5, Sector: "reactor"},
 	AbsorberRod:        {Name: "Absorber-Stab", Cost: 3, Sector: "reactor", AvailableFromMonth: 3},
 	UraniumPlate:       {Name: "Uran-Platte", Cost: 5, InitialCharge: 2, MaxCharge: 2, Sector: "reactor", AvailableFromMonth: 3},
 	Tokamak:            {Name: "Tokamak-Kammer", Cost: 8, InitialCharge: -1, Sector: "reactor", AvailableFromMonth: 4},
 	Relay:              {Name: "Relais/Weiche", Cost: 1, Sector: "grid"},
-	Transformer:        {Name: "Transformator", Cost: 3, InitialCharge: 6, MaxCharge: 6, Sector: "grid"},
-	Ground:             {Name: "Erdung/Widerstand", Cost: 1, Sector: "grid"},
-	EmergencyGenerator: {Name: "Notgenerator", Cost: 2, InitialCharge: 1, MaxCharge: 1, Sector: "grid"},
+	Transformer:        {Name: "Transformator", Cost: 2, InitialCharge: 6, MaxCharge: 6, Sector: "grid"},
+	Ground:             {Name: "Erdung", Cost: 1, Sector: "grid"},
+	EmergencyGenerator: {Name: "Notgenerator", Cost: 3, InitialCharge: 1, MaxCharge: 1, Sector: "grid", AvailableFromMonth: 2},
 	LeadAccumulator:    {Name: "Blei-Akkumulator", Cost: 3, MaxCharge: 2, Sector: "grid", AvailableFromMonth: 2},
-	CapacitorBank:      {Name: "Kondensator-Bank", Cost: 4, MaxCharge: 5, Sector: "grid", AvailableFromMonth: 2},
+	CapacitorBank:      {Name: "Kondensator-Bank", Cost: 4, MaxCharge: 4, Sector: "grid", AvailableFromMonth: 2},
 	PumpedStorage:      {Name: "Pumpspeicherwerk", Cost: 4, MaxCharge: 5, Sector: "grid", AvailableFromMonth: 3},
 	HVCascade:          {Name: "Hochspannungs-Kaskade", Cost: 3, InitialCharge: 8, MaxCharge: 8, Sector: "grid", AvailableFromMonth: 3},
-	Superconductor:     {Name: "Supraleiter", Cost: 4, Sector: "grid", AvailableFromMonth: 4},
+	Superconductor:      {Name: "Supraleiter", Cost: 4, Sector: "grid", AvailableFromMonth: 4},
+	PressureValve:       {Name: "Druckventil", Cost: 2, MaxCharge: 2, Sector: "reactor"},
+	DistributionStation: {Name: "Verteilerstation", Cost: 2, MaxCharge: 2, Sector: "grid"},
 }
 
 // ReactorMarket lists placeable reactor fields for random generation.
 var ReactorMarket = []Type{
-	Mirror, CoalChamber, CoolingTower, GasBoiler, AbsorberRod, UraniumPlate, Tokamak,
+	Mirror, CoolingTower, PressureValve, GasBoiler, CoalChamber, AbsorberRod, UraniumPlate, Tokamak,
 }
 
 // GridMarket lists placeable grid fields for random generation.
 var GridMarket = []Type{
-	Relay, Transformer, Ground, EmergencyGenerator,
+	Relay, Transformer, Ground, EmergencyGenerator, DistributionStation,
 	LeadAccumulator, CapacitorBank, PumpedStorage, HVCascade, Superconductor,
 }
 
@@ -80,6 +86,7 @@ type Tile struct {
 	Orientation    hex.Rotation // mirror/relay facing (0-5)
 	TokamakCounter int
 	StoredVoltage  int
+	UnboundHeat    int          // Kohlebrennkammer: staged unbound heat chips
 	SuperTarget    hex.Rotation // superconductor aim (0-5)
 }
 
@@ -118,5 +125,6 @@ func (t *Tile) Cost() int {
 // HasRotation reports whether a placed field's facing affects simulation.
 func HasRotation(t Type) bool {
 	return t == Mirror || t == Relay || t == CoolingTower || t == Ground ||
-		t == EmergencyGenerator || t == Superconductor
+		t == EmergencyGenerator || t == Superconductor || t == PressureValve ||
+		t == DistributionStation
 }

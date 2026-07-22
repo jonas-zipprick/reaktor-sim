@@ -267,7 +267,7 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 				rng := rand.New(rand.NewSource(job.seed))
 				budgetP1 := opts.Finance.ReactorBudget + job.parent.leftover.Player1
 				budgetP2 := opts.Finance.GridBudget + job.parent.leftover.Player2
-				endLeft, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter, 0, rules.Month{
+				spendRes, err := board.SpendShiftBudget(rng, base, budgetP1, budgetP2, opts.MonthFilter, 0, rules.Month{
 					EnergyID:  opts.EnergyCard.ID,
 					FinanceID: opts.Finance.ID,
 				})
@@ -280,7 +280,7 @@ func scanShiftBranch(k int, from, to int64, parents []parentBoard, opts Options,
 					tracker.finish(true)
 					continue
 				}
-				out := evaluateShift(job.seed, base, opts, k, job.parent.prevFP, job.parent.demand, job.parent.damage, job.parent.emitterDamage, job.parent.leftover, endLeft)
+				out := evaluateShift(job.seed, base, opts, k, job.parent.prevFP, job.parent.demand, job.parent.damage, job.parent.emitterDamage, job.parent.leftover, spendRes)
 				if err := collector.add(out); err != nil {
 					tracker.setErr(err)
 					return
